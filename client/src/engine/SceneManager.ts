@@ -53,8 +53,11 @@ export class SceneManager {
     sunLight.specular = new Color3(1.0, 0.95, 0.88);
     sunLight.position = new Vector3(-80, 60, 100);
 
-    // Shadow generator — PCF soft shadows
-    try {
+    // Shadow generator — skip on mobile for performance
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    if (isMobile) {
+      // No shadows on mobile — too expensive
+    } else try {
       this.shadowGenerator = new ShadowGenerator(1024, sunLight);
       this.shadowGenerator.usePercentageCloserFiltering = true;
       this.shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_LOW;

@@ -65,7 +65,7 @@ export function App() {
 
   return (
     <div ref={containerRef} style={{
-      width: '100%', height: '100%', position: 'relative', overflow: 'hidden',
+      width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden',
     }}>
       {/* Lobby overlay — renders ON TOP of the 3D canvas */}
       {showLobby && (

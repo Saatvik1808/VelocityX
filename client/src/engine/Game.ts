@@ -213,16 +213,21 @@ export class Game {
     // 14. Camera
     this.chaseCamera = new ChaseCamera(scene);
 
-    // 15. Post-processing
-    try {
-      this.postProcessing = new PostProcessingStack(scene, this.chaseCamera.camera);
-    } catch (e) {
-      console.warn('Post-processing init failed:', e);
+    // 15. Post-processing — skip on mobile for performance
+    const isMobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    if (!isMobileDevice) {
+      try {
+        this.postProcessing = new PostProcessingStack(scene, this.chaseCamera.camera);
+      } catch (e) {
+        console.warn('Post-processing init failed:', e);
+      }
     }
 
-    // 16. Particles
-    this.tireSmokeEmitter = new TireSmokeEmitter(scene);
-    this.sparkEmitter = new SparkEmitter(scene);
+    // 16. Particles — skip on mobile for performance
+    if (!isMobileDevice) {
+      this.tireSmokeEmitter = new TireSmokeEmitter(scene);
+      this.sparkEmitter = new SparkEmitter(scene);
+    }
 
     // 17. Skid marks
     this.skidMarkRenderer = new SkidMarkRenderer(scene);
