@@ -49,6 +49,13 @@ app.use(express.static(clientDist));
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', players: io.engine.clientsCount }));
 
+// Self-ping to prevent Render free tier spin-down (every 4 minutes)
+if (process.env.RENDER_EXTERNAL_URL) {
+  setInterval(() => {
+    fetch(`${process.env.RENDER_EXTERNAL_URL}/health`).catch(() => {});
+  }, 4 * 60 * 1000);
+}
+
 // SPA fallback — serve index.html for all non-API routes
 app.get('*', (_req, res) => {
   res.sendFile(join(clientDist, 'index.html'));

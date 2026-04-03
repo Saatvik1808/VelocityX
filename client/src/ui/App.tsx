@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { HUD } from './HUD.js';
 import { Lobby } from './Lobby.js';
 import { RaceResults } from './RaceResults.js';
+import { TouchControls } from './TouchControls.js';
 import { useGameStore } from './store.js';
 import { Game } from '../engine/Game.js';
 import { NetworkManager } from '../network/NetworkManager.js';
@@ -100,6 +101,9 @@ export function App() {
 
       {/* HUD shows only when not in lobby */}
       {!showLobby && <HUD />}
+
+      {/* Touch controls for mobile */}
+      {!showLobby && <TouchControls />}
 
       {/* Results screen overlay */}
       <ResultsOverlay onPlayAgain={() => window.location.reload()} onLeave={() => window.location.reload()} />
