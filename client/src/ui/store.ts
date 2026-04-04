@@ -10,6 +10,7 @@
 
 import { create } from 'zustand';
 import type { GamePhase } from '@neon-drift/shared';
+import { DEFAULT_VEHICLE_ID } from '@neon-drift/shared';
 
 interface GameStore {
   gamePhase: GamePhase;
@@ -31,6 +32,9 @@ interface GameStore {
   currentCheckpoint: number;
   totalCheckpoints: number;
   raceResults: import('@neon-drift/shared').RaceResult[];
+  selectedVehicleId: string;
+  masterVolume: number;
+  graphicsQuality: 'low' | 'medium' | 'high' | 'ultra';
 
   setGamePhase: (phase: GamePhase) => void;
   setSpeed: (speed: number) => void;
@@ -50,6 +54,9 @@ interface GameStore {
   setCurrentCheckpoint: (cp: number) => void;
   setTotalCheckpoints: (total: number) => void;
   setRaceResults: (results: import('@neon-drift/shared').RaceResult[]) => void;
+  setSelectedVehicleId: (id: string) => void;
+  setMasterVolume: (vol: number) => void;
+  setGraphicsQuality: (q: 'low' | 'medium' | 'high' | 'ultra') => void;
 }
 
 export const useGameStore = create<GameStore>()((set) => ({
@@ -72,6 +79,9 @@ export const useGameStore = create<GameStore>()((set) => ({
   currentCheckpoint: 0,
   totalCheckpoints: 0,
   raceResults: [],
+  selectedVehicleId: DEFAULT_VEHICLE_ID,
+  masterVolume: 0.7,
+  graphicsQuality: 'high',
 
   setGamePhase: (phase) => set({ gamePhase: phase }),
   setSpeed: (speed) => set({ speed }),
@@ -91,4 +101,7 @@ export const useGameStore = create<GameStore>()((set) => ({
   setCurrentCheckpoint: (cp: number) => set({ currentCheckpoint: cp }),
   setTotalCheckpoints: (total: number) => set({ totalCheckpoints: total }),
   setRaceResults: (results: import('@neon-drift/shared').RaceResult[]) => set({ raceResults: results }),
+  setSelectedVehicleId: (id: string) => set({ selectedVehicleId: id }),
+  setMasterVolume: (vol: number) => set({ masterVolume: vol }),
+  setGraphicsQuality: (q: 'low' | 'medium' | 'high' | 'ultra') => set({ graphicsQuality: q }),
 }));

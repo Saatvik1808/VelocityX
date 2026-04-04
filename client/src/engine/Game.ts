@@ -10,7 +10,7 @@
 
 import { Vector3, Quaternion } from '@babylonjs/core';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { PHYSICS, TRACK } from '@neon-drift/shared';
+import { PHYSICS, TRACK, VEHICLES, DEFAULT_VEHICLE_ID } from '@neon-drift/shared';
 
 import { Renderer } from './Renderer.js';
 import { SceneManager } from './SceneManager.js';
@@ -85,7 +85,7 @@ export class Game {
 
   // Gameplay
   private checkpointSystem: CheckpointSystem | null = null;
-  private driftSystem = new DriftSystem();
+  private driftSystem: DriftSystem = new DriftSystem();
   private nitroSystem = new NitroSystem();
   private raceFinished = false;
 
@@ -189,12 +189,17 @@ export class Game {
       playerIndex = Math.floor(Math.random() * 8);
     }
     const startInfo = this.trackBuilder.getStartPosition(playerIndex);
+    const selectedVehicle = useGameStore.getState().selectedVehicleId;
     this.vehiclePhysics = new VehiclePhysics(
-      RAPIER, this.world, startInfo.position, startInfo.rotation,
+      RAPIER, this.world, startInfo.position, startInfo.rotation, selectedVehicle,
     );
 
-    // 12. Vehicle visuals
-    this.vehicleVisuals = new VehicleVisuals(scene);
+    // Set vehicle-specific drift charge rate
+    const vehicleDef = VEHICLES[selectedVehicle] ?? VEHICLES[DEFAULT_VEHICLE_ID]!;
+    this.driftSystem.driftMult = vehicleDef.driftMult;
+
+    // 12. Vehicle visuals — colored by selected vehicle
+    this.vehicleVisuals = new VehicleVisuals(scene, selectedVehicle);
 
     // 12b. Register car as shadow caster, ground as receiver
     this.vehicleVisuals.root.getChildMeshes().forEach((mesh) => {
@@ -516,6 +521,10 @@ export class Game {
     this.postProcessing?.setSpeed(state.speed);
 
     // === AUDIO UPDATES ===
+    // Sync master volume from settings store
+    const storeVol = useGameStore.getState().masterVolume;
+    this.audioEngine?.setVolume(storeVol);
+
     const absSpeedMs = Math.abs(state.speed);
     const rpm = Math.min(absSpeedMs / 45, 1); // normalized RPM from speed
     const throttle = input.accelerate ? 1 : 0;
@@ -539,11 +548,6 @@ export class Game {
     // Checkpoint detection — use visual position (which matches track coordinates)
     const carVisualPos = this.vehicleVisuals.root.position;
     const justFinished = this.checkpointSystem?.update(carVisualPos.x, carVisualPos.z, this.elapsed);
-
-    // Debug: log every 60 frames
-    if (Math.floor(this.elapsed * 60) % 60 === 0 && this.checkpointSystem) {
-      console.log(`Car: (${carVisualPos.x.toFixed(0)}, ${carVisualPos.z.toFixed(0)}) | NextCP: ${this.checkpointSystem.currentCheckpointIndex} | Lap: ${this.checkpointSystem.lap} | Finished: ${this.checkpointSystem.finished}`);
-    }
 
     if (justFinished) {
       // Double ensure — finishRace should already be called via callback

@@ -23,8 +23,10 @@ import {
   WHEEL_POSITIONS,
   STEERING,
   ENGINE,
+  VEHICLES,
+  DEFAULT_VEHICLE_ID,
 } from '@neon-drift/shared';
-import type { InputState, VehicleState, Vec3Like } from '@neon-drift/shared';
+import type { InputState, VehicleState, Vec3Like, VehicleDef } from '@neon-drift/shared';
 import { clamp } from '../utils/math.js';
 
 export class VehiclePhysics {
@@ -33,6 +35,7 @@ export class VehiclePhysics {
   private chassisBody: RAPIER.RigidBody;
   private controller: RAPIER.DynamicRayCastVehicleController;
   private currentSteering = 0;
+  private vehicleDef: VehicleDef;
 
   // Pre-allocated output objects to avoid per-frame allocation
   private readonly _state: VehicleState = {
@@ -48,9 +51,11 @@ export class VehiclePhysics {
     world: RAPIER.World,
     startPos: Vec3Like,
     startRot: { x: number; y: number; z: number; w: number },
+    vehicleId?: string,
   ) {
     this.rapier = rapier;
     this.world = world;
+    this.vehicleDef = VEHICLES[vehicleId ?? DEFAULT_VEHICLE_ID] ?? VEHICLES[DEFAULT_VEHICLE_ID]!;
 
     // Create chassis rigid body
     const chassisDesc = rapier.RigidBodyDesc.dynamic()
@@ -62,11 +67,12 @@ export class VehiclePhysics {
 
     this.chassisBody = world.createRigidBody(chassisDesc);
 
-    // Create chassis collider
+    // Create chassis collider — mass scaled by vehicle definition
     const { CHASSIS_HALF_EXTENTS, CHASSIS_MASS, CENTER_OF_MASS_Y_OFFSET } = VEHICLE;
+    const scaledMass = CHASSIS_MASS * this.vehicleDef.massMult;
     const colliderDesc = rapier.ColliderDesc
       .cuboid(CHASSIS_HALF_EXTENTS.x, CHASSIS_HALF_EXTENTS.y, CHASSIS_HALF_EXTENTS.z)
-      .setMass(CHASSIS_MASS)
+      .setMass(scaledMass)
       .setFriction(0.6)
       .setRestitution(0.45); // realistic car-to-car bounce
     world.createCollider(colliderDesc, this.chassisBody);
@@ -119,10 +125,11 @@ export class VehiclePhysics {
   applyInput(input: InputState, dt: number): void {
     const speed = this.getForwardSpeed();
 
-    // --- Steering ---
+    // --- Steering (scaled by vehicle handling multiplier) ---
+    const maxAngle = STEERING.MAX_ANGLE * this.vehicleDef.handlingMult;
     let targetSteering = 0;
-    if (input.steerLeft) targetSteering -= STEERING.MAX_ANGLE;
-    if (input.steerRight) targetSteering += STEERING.MAX_ANGLE;
+    if (input.steerLeft) targetSteering -= maxAngle;
+    if (input.steerRight) targetSteering += maxAngle;
 
     // Smoothly approach target steering
     if (targetSteering !== 0) {
@@ -163,7 +170,7 @@ export class VehiclePhysics {
     let brakeForce = 0;
 
     if (input.accelerate) {
-      engineForce = ENGINE.MAX_FORCE;
+      engineForce = ENGINE.MAX_FORCE * this.vehicleDef.accelMult;
     } else if (input.brake) {
       if (speed > 1.0) {
         brakeForce = ENGINE.BRAKE_FORCE;

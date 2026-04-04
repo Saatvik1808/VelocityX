@@ -36,3 +36,6 @@ export type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from './protocol.js';
+
+export type { VehicleDef } from './vehicles.js';
+export { VEHICLES, VEHICLE_IDS, DEFAULT_VEHICLE_ID } from './vehicles.js';

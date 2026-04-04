@@ -19,7 +19,8 @@ import {
   Quaternion,
 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
-import { VEHICLE, WHEELS, WHEEL_POSITIONS } from '@neon-drift/shared';
+import { VEHICLE, WHEELS, WHEEL_POSITIONS, VEHICLES, DEFAULT_VEHICLE_ID } from '@neon-drift/shared';
+import type { VehicleDef } from '@neon-drift/shared';
 import type { VehiclePhysics } from './VehiclePhysics.js';
 
 export class VehicleVisuals {
@@ -28,6 +29,7 @@ export class VehicleVisuals {
   private scene: Scene;
   private smoothRoll = 0;
   private smoothPitch = 0;
+  private vehicleDef: VehicleDef;
 
   private wheelContainers: TransformNode[] = [];
   private wheelSpinners: TransformNode[] = [];
@@ -36,8 +38,9 @@ export class VehicleVisuals {
   private readonly _rearLeftWorld = new Vector3();
   private readonly _rearRightWorld = new Vector3();
 
-  constructor(scene: Scene) {
+  constructor(scene: Scene, vehicleId?: string) {
     this.scene = scene;
+    this.vehicleDef = VEHICLES[vehicleId ?? DEFAULT_VEHICLE_ID] ?? VEHICLES[DEFAULT_VEHICLE_ID]!;
     this.root = new TransformNode('vehicle', scene);
     this.bodyNode = new TransformNode('bodyNode', scene);
     this.bodyNode.parent = this.root;
@@ -50,10 +53,11 @@ export class VehicleVisuals {
   private buildCar(): void {
     const W = 1.9, H = 0.7, L = 4.2;
     const hw = W / 2, hl = L / 2;
+    const def = this.vehicleDef;
 
-    // === MATERIALS — Dark & Neon ===
+    // === MATERIALS — Dark & Neon (colored per vehicle) ===
     const bodyMat = new PBRMaterial('carBody', this.scene);
-    bodyMat.albedoColor = new Color3(0.03, 0.03, 0.05);  // near-black
+    bodyMat.albedoColor = new Color3(def.bodyColor[0], def.bodyColor[1], def.bodyColor[2]);
     bodyMat.metallic = 0.85;
     bodyMat.roughness = 0.1;   // very reflective — mirrors neon
     bodyMat.clearCoat.isEnabled = true;
@@ -78,16 +82,17 @@ export class VehicleVisuals {
     chromeMat.roughness = 0.03;
     chromeMat.environmentIntensity = 3.0;
 
-    // Neon cyan headlight material
+    // Neon headlight material — uses vehicle accent color
+    const ac = def.accentColor;
     const hlMat = new PBRMaterial('hl', this.scene);
-    hlMat.albedoColor = new Color3(0, 0.5, 0.5);
-    hlMat.emissiveColor = new Color3(0, 1, 1);  // cyan glow
+    hlMat.albedoColor = new Color3(ac[0] * 0.5, ac[1] * 0.5, ac[2] * 0.5);
+    hlMat.emissiveColor = new Color3(ac[0], ac[1], ac[2]);
     hlMat.emissiveIntensity = 3.0;
 
-    // Neon accent strip material
+    // Neon accent strip material — uses vehicle accent color
     const accentMat = new PBRMaterial('accent', this.scene);
-    accentMat.albedoColor = new Color3(0, 0.3, 0.3);
-    accentMat.emissiveColor = new Color3(0, 1, 1);  // cyan
+    accentMat.albedoColor = new Color3(ac[0] * 0.3, ac[1] * 0.3, ac[2] * 0.3);
+    accentMat.emissiveColor = new Color3(ac[0], ac[1], ac[2]);
     accentMat.emissiveIntensity = 2.0;
 
     // === BODY — main lower body ===
@@ -182,11 +187,11 @@ export class VehicleVisuals {
       h.parent = this.bodyNode;
     }
 
-    // Tail lights — neon magenta
+    // Tail lights — tinted by accent color
     for (const s of [-1, 1]) {
       const tlMat = new PBRMaterial('tl', this.scene);
-      tlMat.albedoColor = new Color3(0.5, 0, 0.3);
-      tlMat.emissiveColor = new Color3(1, 0, 0.6);  // magenta-red
+      tlMat.albedoColor = new Color3(ac[0] * 0.5, ac[1] * 0.1, ac[2] * 0.3);
+      tlMat.emissiveColor = new Color3(Math.max(ac[0], 0.6), ac[1] * 0.3, ac[2] * 0.5);
       tlMat.emissiveIntensity = 1.2;
       const tl = MeshBuilder.CreateBox('tl', { width: 0.25, height: 0.06, depth: 0.04 }, this.scene);
       tl.material = tlMat;
@@ -215,18 +220,21 @@ export class VehicleVisuals {
     }
   }
 
-  /** Neon underglow — colored light under the car */
+  /** Neon underglow — colored per vehicle definition */
   private buildUnderglow(): void {
-    // Cyan underglow light
+    const ug = this.vehicleDef.underglowColor;
+    const ac = this.vehicleDef.accentColor;
+
+    // Primary underglow — vehicle underglow color
     const underglow = new PointLight('underglow', new Vector3(0, -0.1, 0), this.scene);
-    underglow.diffuse = new Color3(0, 1, 1);  // cyan
+    underglow.diffuse = new Color3(ug[0], ug[1], ug[2]);
     underglow.intensity = 4.5;
     underglow.range = 10;
     underglow.parent = this.root;
 
-    // Rear underglow — magenta
+    // Rear underglow — accent color shifted
     const rearGlow = new PointLight('rearGlow', new Vector3(0, -0.1, -1.5), this.scene);
-    rearGlow.diffuse = new Color3(1, 0, 1);  // magenta
+    rearGlow.diffuse = new Color3(ac[0], ac[1], ac[2]);
     rearGlow.intensity = 3.5;
     rearGlow.range = 7;
     rearGlow.parent = this.root;
@@ -252,10 +260,11 @@ export class VehicleVisuals {
     hubMat.metallic = 0.8;
     hubMat.roughness = 0.2;
 
-    // Neon wheel ring material
+    // Neon wheel ring material — vehicle accent color
+    const wac = this.vehicleDef.accentColor;
     const wheelNeonMat = new PBRMaterial('wheelNeon', this.scene);
-    wheelNeonMat.albedoColor = new Color3(0, 0.3, 0.3);
-    wheelNeonMat.emissiveColor = new Color3(0, 1, 1);  // cyan glow
+    wheelNeonMat.albedoColor = new Color3(wac[0] * 0.3, wac[1] * 0.3, wac[2] * 0.3);
+    wheelNeonMat.emissiveColor = new Color3(wac[0], wac[1], wac[2]);
     wheelNeonMat.emissiveIntensity = 1.0;
 
     for (let wi = 0; wi < WHEEL_POSITIONS.length; wi++) {

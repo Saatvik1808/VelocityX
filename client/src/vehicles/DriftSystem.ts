@@ -22,6 +22,9 @@ export class DriftSystem {
   boostMultiplier = 0;
   boostJustActivated = false;
 
+  /** Vehicle-specific drift charge rate multiplier (default 1.0) */
+  driftMult = 1.0;
+
   private wasDrifting = false;
 
   /**
@@ -35,8 +38,9 @@ export class DriftSystem {
     // Accumulate drift charge — faster when actually turning (more fun)
     if (isDrifting) {
       // Charge faster when steering (real drifting, not just holding Space straight)
+      // driftMult scales charge rate — cars with high drift stat charge faster
       const steerBonus = (input.steerLeft || input.steerRight) ? 1.5 : 0.8;
-      this.chargeTime += dt * steerBonus;
+      this.chargeTime += dt * steerBonus * this.driftMult;
 
       // Determine charge level
       if (this.chargeTime >= DRIFT_BOOST.LEVEL_3_TIME) {

@@ -13,6 +13,7 @@ import { HUD } from './HUD.js';
 import { Lobby } from './Lobby.js';
 import { RaceResults } from './RaceResults.js';
 import { TouchControls } from './TouchControls.js';
+import { Settings } from './Settings.js';
 import { useGameStore } from './store.js';
 import { Game } from '../engine/Game.js';
 import { NetworkManager } from '../network/NetworkManager.js';
@@ -31,6 +32,7 @@ export function App() {
   const gameRef = useRef<Game | null>(null);
   const [network] = useState(() => new NetworkManager());
   const [showLobby, setShowLobby] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
   const [networkReady, setNetworkReady] = useState(false);
 
   // Connect network on mount and expose globally for Game.ts
@@ -104,6 +106,27 @@ export function App() {
 
       {/* Touch controls for mobile */}
       {!showLobby && <TouchControls />}
+
+      {/* Settings gear icon — always visible */}
+      <button
+        onClick={() => setShowSettings(true)}
+        style={{
+          position: 'absolute', top: 12, right: 12, zIndex: 1500,
+          width: 40, height: 40, borderRadius: 10, border: 'none',
+          background: 'rgba(0, 0, 0, 0.4)', color: '#00ffff',
+          cursor: 'pointer', fontSize: 20, display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(4px)',
+          boxShadow: '0 0 10px rgba(0,255,255,0.15)',
+          transition: 'all 0.2s',
+        }}
+        title="Settings"
+      >
+        &#9881;
+      </button>
+
+      {/* Settings overlay */}
+      {showSettings && <Settings onClose={() => setShowSettings(false)} />}
 
       {/* Results screen overlay */}
       <ResultsOverlay onPlayAgain={() => window.location.reload()} onLeave={() => window.location.reload()} />

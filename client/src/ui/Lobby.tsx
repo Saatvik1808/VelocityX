@@ -5,6 +5,9 @@
 import { useState, useEffect } from 'react';
 import type { NetworkManager } from '../network/NetworkManager.js';
 import type { RoomSummary, RoomId } from '@neon-drift/shared';
+import { VEHICLES, VEHICLE_IDS } from '@neon-drift/shared';
+import type { VehicleDef } from '@neon-drift/shared';
+import { useGameStore } from './store.js';
 
 interface LobbyProps {
   network: NetworkManager;
@@ -17,6 +20,8 @@ export function Lobby({ network, onGameStart }: LobbyProps) {
   const [playerName, setPlayerName] = useState('Racer');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const selectedVehicleId = useGameStore((s) => s.selectedVehicleId);
+  const setSelectedVehicleId = useGameStore((s) => s.setSelectedVehicleId);
 
   useEffect(() => {
     network.onRoomList = (r) => setRooms(r);
@@ -216,6 +221,63 @@ export function Lobby({ network, onGameStart }: LobbyProps) {
             outline: 'none',
           }}
         />
+      </div>
+
+      {/* Vehicle selector */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, opacity: 0.4, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
+          Select Vehicle
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {VEHICLE_IDS.map((vid) => {
+            const v = VEHICLES[vid]!;
+            const isSelected = selectedVehicleId === vid;
+            const accentCss = `rgb(${Math.round(v.accentColor[0] * 255)}, ${Math.round(v.accentColor[1] * 255)}, ${Math.round(v.accentColor[2] * 255)})`;
+            return (
+              <button
+                key={vid}
+                onClick={() => setSelectedVehicleId(vid)}
+                style={{
+                  padding: '10px 12px', borderRadius: 10, border: 'none',
+                  background: isSelected
+                    ? `linear-gradient(135deg, ${accentCss}22, ${accentCss}11)`
+                    : 'rgba(255,255,255,0.04)',
+                  outline: isSelected ? `2px solid ${accentCss}` : '2px solid transparent',
+                  cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s',
+                  boxShadow: isSelected ? `0 0 20px ${accentCss}33` : 'none',
+                }}
+              >
+                <div style={{
+                  fontSize: 14, fontWeight: 800, letterSpacing: 2, color: isSelected ? accentCss : '#ccc',
+                  marginBottom: 2,
+                }}>
+                  {v.name}
+                </div>
+                <div style={{ fontSize: 10, opacity: 0.5, color: '#aaa', lineHeight: 1.3 }}>
+                  {v.description}
+                </div>
+                <div style={{
+                  display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap',
+                }}>
+                  {[
+                    { label: 'SPD', val: v.topSpeedMult },
+                    { label: 'ACC', val: v.accelMult },
+                    { label: 'HND', val: v.handlingMult },
+                    { label: 'DFT', val: v.driftMult },
+                  ].map(({ label, val }) => (
+                    <div key={label} style={{
+                      fontSize: 9, padding: '2px 5px', borderRadius: 4,
+                      background: `${accentCss}18`, color: accentCss,
+                      fontWeight: 700,
+                    }}>
+                      {label} {val.toFixed(1)}x
+                    </div>
+                  ))}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Create room */}
