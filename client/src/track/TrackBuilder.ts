@@ -164,11 +164,11 @@ export class TrackBuilder {
 
     const mat = new PBRMaterial('groundMat', this.scene);
 
-    // Dark ground — picks up faint neon reflections
-    mat.albedoColor = new Color3(0.03, 0.03, 0.04);
-    mat.metallic = 0.2;
-    mat.roughness = 0.7;
-    mat.environmentIntensity = 0.15;
+    // Ground — reflective enough to catch neon light pools from street lamps
+    mat.albedoColor = new Color3(0.04, 0.04, 0.05);
+    mat.metallic = 0.35;
+    mat.roughness = 0.5;
+    mat.environmentIntensity = 0.3;
 
     ground.material = mat;
     ground.receiveShadows = true;

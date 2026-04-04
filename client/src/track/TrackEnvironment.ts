@@ -45,6 +45,9 @@ export class TrackEnvironment {
     this.scene = scene;
     this.buildSky(scene);
     this.buildCityBuildings(scene);
+    this.buildInnerCityBlocks(scene);
+    this.buildStreetLamps(scene);
+    this.buildGroundNeonStrips(scene);
     this.buildMountains(scene);
     this.buildNeonSigns(scene);
     this.buildGroundHaze(scene);
@@ -58,12 +61,34 @@ export class TrackEnvironment {
   }
 
   private isSafeFromTrack(px: number, pz: number, minDist: number = 30): boolean {
+    // Check minimum distance from track centerline
     for (let j = 0; j < this.centerline.length; j += 5) {
       const cp = this.centerline[j]!;
       const d = Math.sqrt((px - cp.x) ** 2 + (pz - cp.z) ** 2);
       if (d < TRACK.ROAD_WIDTH / 2 + minDist) return false;
     }
+    // Reject points inside the track loop (ray-casting point-in-polygon)
+    if (this.isInsideTrackLoop(px, pz)) return false;
     return true;
+  }
+
+  /** Ray-casting algorithm: cast a ray in +X and count centerline edge crossings.
+   *  Odd crossings = inside the polygon, even = outside. */
+  private isInsideTrackLoop(px: number, pz: number): boolean {
+    const pts = this.centerline;
+    const step = Math.max(1, Math.floor(pts.length / 100)); // sample ~100 edges
+    let inside = false;
+    let j = pts.length - step;
+    for (let i = 0; i < pts.length; i += step) {
+      const xi = pts[i]!.x, zi = pts[i]!.z;
+      const xj = pts[j]!.x, zj = pts[j]!.z;
+      if ((zi > pz) !== (zj > pz) &&
+          px < (xj - xi) * (pz - zi) / (zj - zi) + xi) {
+        inside = !inside;
+      }
+      j = i;
+    }
+    return inside;
   }
 
   private buildSky(scene: Scene): void {
@@ -219,6 +244,214 @@ export class TrackEnvironment {
     tex.wrapU = Texture.WRAP_ADDRESSMODE;
     tex.wrapV = Texture.WRAP_ADDRESSMODE;
     return tex;
+  }
+
+  /** Smaller buildings closer to the track — fills the dark gap between road and skyline */
+  private buildInnerCityBlocks(scene: Scene): void {
+    const windowTex = this.genNeonWindowTexture(scene);
+
+    const mat = new PBRMaterial('innerBldgMat', scene);
+    mat.albedoColor = new Color3(0.05, 0.05, 0.07);
+    mat.metallic = 0.4;
+    mat.roughness = 0.6;
+    mat.emissiveTexture = windowTex;
+    mat.emissiveColor = new Color3(1, 1, 1);
+    mat.emissiveIntensity = 1.2;
+    mat.environmentIntensity = 0.25;
+    mat.freeze();
+
+    const base = MeshBuilder.CreateBox('innerBldg', { size: 1 }, scene);
+    base.material = mat;
+    base.isPickable = false;
+    base.parent = this.root;
+
+    const matrices: Matrix[] = [];
+    const count = 80;
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + this.rand(i + 3000) * 0.3;
+      // Place between 50m and 200m from center — the dark gap
+      const radius = 50 + this.rand(i + 3100) * 180;
+      const bx = Math.cos(angle) * radius + (this.rand(i + 3200) - 0.5) * 20;
+      const bz = Math.sin(angle) * radius + (this.rand(i + 3300) - 0.5) * 20;
+
+      if (!this.isSafeFromTrack(bx, bz, 22)) continue;
+
+      // Shorter buildings closer to the track
+      const height = 8 + this.rand(i + 3400) * 45;
+      const width = 6 + this.rand(i + 3500) * 12;
+      const depth = 6 + this.rand(i + 3600) * 12;
+      const rotY = this.rand(i + 3700) * Math.PI;
+
+      matrices.push(Matrix.Compose(
+        new Vector3(width, height, depth),
+        new Vector3(0, rotY, 0).toQuaternion(),
+        new Vector3(bx, height / 2, bz),
+      ));
+
+      // Register physics collider so cars can't pass through
+      this.colliderData.push({
+        position: { x: bx, y: height / 2, z: bz },
+        halfExtents: { x: width / 2, y: height / 2, z: depth / 2 },
+        rotationY: rotY,
+      });
+    }
+
+    if (matrices.length > 0) {
+      const buf = new Float32Array(matrices.length * 16);
+      matrices.forEach((m, idx) => m.copyToArray(buf, idx * 16));
+      base.thinInstanceSetBuffer('matrix', buf, 16);
+      base.freezeWorldMatrix();
+    }
+  }
+
+  /** Street lamps with warm amber glow scattered around the track.
+   *  Uses emissive geometry + ground glow discs (no PointLights) — bloom creates the effect. */
+  private buildStreetLamps(scene: Scene): void {
+    const lampCount = 30;
+    const warmColors = [
+      new Color3(1.0, 0.7, 0.2),   // warm amber
+      new Color3(1.0, 0.8, 0.3),   // golden yellow
+      new Color3(0.9, 0.6, 0.15),  // deep amber
+      new Color3(0, 0.9, 0.9),     // cyan accent
+      new Color3(0.8, 0, 0.6),     // magenta accent
+    ];
+
+    // Pole material — dark metal
+    const poleMat = new PBRMaterial('lampPoleMat', scene);
+    poleMat.albedoColor = new Color3(0.06, 0.06, 0.06);
+    poleMat.metallic = 0.7;
+    poleMat.roughness = 0.3;
+    poleMat.freeze();
+
+    // Shared materials per color (5 head + 5 glow = 10 materials total, not 60)
+    const headMats: PBRMaterial[] = [];
+    const glowMats: PBRMaterial[] = [];
+    for (let c = 0; c < warmColors.length; c++) {
+      const hm = new PBRMaterial(`lampHeadMat${c}`, scene);
+      hm.albedoColor = new Color3(0.02, 0.02, 0.02);
+      hm.emissiveColor = warmColors[c]!;
+      hm.emissiveIntensity = 3.0;
+      hm.freeze();
+      headMats.push(hm);
+
+      const gm = new PBRMaterial(`lampGlowMat${c}`, scene);
+      gm.albedoColor = new Color3(0.01, 0.01, 0.01);
+      gm.emissiveColor = warmColors[c]!;
+      gm.emissiveIntensity = 0.6;
+      gm.alpha = 0.4;
+      gm.backFaceCulling = false;
+      gm.freeze();
+      glowMats.push(gm);
+    }
+
+    const pole = MeshBuilder.CreateCylinder('lampPole', {
+      diameterTop: 0.08, diameterBottom: 0.12, height: 5, tessellation: 5,
+    }, scene);
+    pole.material = poleMat;
+    pole.isPickable = false;
+    pole.parent = this.root;
+
+    const poleMatrices: Matrix[] = [];
+
+    for (let i = 0; i < lampCount; i++) {
+      const angle = (i / lampCount) * Math.PI * 2 + this.rand(i + 4000) * 0.2;
+      const radius = 25 + this.rand(i + 4100) * 95;
+      const lx = Math.cos(angle) * radius;
+      const lz = Math.sin(angle) * radius;
+
+      if (!this.isSafeFromTrack(lx, lz, 18)) continue;
+
+      poleMatrices.push(Matrix.Translation(lx, 2.5, lz));
+
+      // Register pole collider so cars can't pass through
+      this.colliderData.push({
+        position: { x: lx, y: 2.5, z: lz },
+        halfExtents: { x: 0.15, y: 2.5, z: 0.15 },
+        rotationY: 0,
+      });
+
+      const colorIdx = i % 5 < 3 ? i % 3 : (3 + i % 2);
+
+      // Glowing lamp head
+      const head = MeshBuilder.CreateBox(`lampH${i}`, { width: 0.35, height: 0.15, depth: 0.35 }, scene);
+      head.material = headMats[colorIdx]!;
+      head.position.set(lx, 5.1, lz);
+      head.isPickable = false;
+      head.freezeWorldMatrix();
+      head.parent = this.root;
+
+      // Emissive ground glow disc — fakes the light pool
+      const disc = MeshBuilder.CreateDisc(`lampDisc${i}`, { radius: 4, tessellation: 8 }, scene);
+      disc.material = glowMats[colorIdx]!;
+      disc.rotation.x = Math.PI / 2;
+      disc.position.set(lx, -0.12, lz);
+      disc.isPickable = false;
+      disc.freezeWorldMatrix();
+      disc.parent = this.root;
+    }
+
+    if (poleMatrices.length > 0) {
+      const buf = new Float32Array(poleMatrices.length * 16);
+      poleMatrices.forEach((m, idx) => m.copyToArray(buf, idx * 16));
+      pole.thinInstanceSetBuffer('matrix', buf, 16);
+      pole.freezeWorldMatrix();
+    }
+  }
+
+  /** Neon ground strips — glowing lines on the ground like sidewalk lighting */
+  private buildGroundNeonStrips(scene: Scene): void {
+    const neonColors = [
+      new Color3(0, 0.8, 0.8),     // cyan
+      new Color3(0.8, 0, 0.6),     // magenta
+      new Color3(0.8, 0.4, 0),     // amber
+    ];
+
+    const stripMat = new PBRMaterial('groundStripMat', scene);
+    stripMat.albedoColor = new Color3(0.02, 0.02, 0.02);
+    stripMat.emissiveColor = new Color3(0, 0.7, 0.7);
+    stripMat.emissiveIntensity = 0.8;
+    stripMat.metallic = 0.5;
+    stripMat.roughness = 0.2;
+    stripMat.freeze();
+
+    const stripBase = MeshBuilder.CreateBox('gStrip', { width: 1, height: 0.02, depth: 0.1 }, scene);
+    stripBase.material = stripMat;
+    stripBase.isPickable = false;
+    stripBase.parent = this.root;
+
+    const matrices: Matrix[] = [];
+    const colors: number[] = [];
+    const stripCount = 60;
+
+    for (let i = 0; i < stripCount; i++) {
+      const angle = (i / stripCount) * Math.PI * 2 + this.rand(i + 5000) * 0.3;
+      const radius = 30 + this.rand(i + 5100) * 100;
+      const sx = Math.cos(angle) * radius;
+      const sz = Math.sin(angle) * radius;
+
+      if (!this.isSafeFromTrack(sx, sz, 16)) continue;
+
+      const len = 4 + this.rand(i + 5200) * 12;
+      const rotY = angle + (this.rand(i + 5300) - 0.5) * 1.0;
+
+      matrices.push(Matrix.Compose(
+        new Vector3(len, 1, 1),
+        new Vector3(0, rotY, 0).toQuaternion(),
+        new Vector3(sx, -0.13, sz),
+      ));
+
+      const c = neonColors[i % 3]!;
+      colors.push(c.r, c.g, c.b, 1);
+    }
+
+    if (matrices.length > 0) {
+      const buf = new Float32Array(matrices.length * 16);
+      matrices.forEach((m, idx) => m.copyToArray(buf, idx * 16));
+      stripBase.thinInstanceSetBuffer('matrix', buf, 16);
+      stripBase.thinInstanceSetBuffer('color', new Float32Array(colors), 4);
+      stripBase.freezeWorldMatrix();
+    }
   }
 
   private buildMountains(scene: Scene): void {
