@@ -49,7 +49,7 @@ export class EngineSynth {
 
     // Subtle distortion for grit
     this.distortion = this.ctx.createWaveShaper();
-    this.distortion.curve = this.makeDistortionCurve(8);
+    this.distortion.curve = this.makeDistortionCurve(8) as Float32Array<ArrayBuffer>;
     this.distortion.oversample = '2x';
 
     // Chain: oscillators → distortion → filter → masterGain → destination
