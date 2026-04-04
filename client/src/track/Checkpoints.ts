@@ -1,162 +1,121 @@
 /**
- * LEARNING NOTE: Checkpoint System
+ * LEARNING NOTE: Distance-Based Checkpoint System
  *
- * Checkpoints are placed along the track spline. The car must pass
- * within range of each one in order. Visible markers show where
- * checkpoints are so the player knows the path.
+ * Simple and reliable: each checkpoint is a ZONE on the track.
+ * When the car enters within the trigger radius → checkpoint hit.
+ * No complex line-crossing math, no ambiguity.
  *
- * Key concepts: trigger volumes, lap counting, progress tracking
+ * Layout: 3 sector gates at 25%, 50%, 75% of the track.
+ * 1 finish line at ~3% (just ahead of spawn on the start/finish straight).
+ * Order: sector1 → sector2 → sector3 → FINISH → lap complete!
+ *
+ * The sequential requirement (must hit in order) prevents shortcutting.
+ *
+ * Key concepts: trigger radius, sequential checkpoints, lap counting
  */
 
-import { CHECKPOINTS } from '@neon-drift/shared';
-import { MeshBuilder, StandardMaterial, Color3 } from '@babylonjs/core';
-import type { Scene } from '@babylonjs/core';
-
-interface CenterlinePoint { x: number; z: number; nx: number; nz: number; }
-
-interface CheckpointData {
+interface Checkpoint {
   x: number;
   z: number;
-  index: number;
+  isFinishLine: boolean;
+  triggered: boolean;
 }
 
+const TRIGGER_RADIUS = 20;
+const RESET_RADIUS = 35;
+
 export class CheckpointSystem {
-  private checkpoints: CheckpointData[] = [];
-  private nextCheckpoint = 0;
-  currentLap = 1;
-  totalLaps = CHECKPOINTS.TOTAL_LAPS;
-  finished = false;
-  finishTime = 0;
-  private detectionRadius = 35; // very generous — instant detection when near
+  private checkpoints: Checkpoint[] = [];
+  private nextCP = 0;
+  private _lap = 1;
+  private _totalLaps: number;
+  private _finished = false;
+  private _finishTime = 0;
+  private _startTime = 0;
 
-  onCheckpointHit: ((index: number, lap: number) => void) | null = null;
-  onLapComplete: ((lap: number, lapTime: number) => void) | null = null;
-  onRaceFinish: ((totalTime: number) => void) | null = null;
+  onCheckpoint: ((cp: number, lap: number) => void) | null = null;
+  onLapDone: ((lap: number) => void) | null = null;
+  onFinish: ((time: number) => void) | null = null;
 
-  private lapStartTime = 0;
-  private raceStartTime = 0;
+  get lap() { return this._lap; }
+  get finished() { return this._finished; }
+  get finishTime() { return this._finishTime; }
+  get totalCheckpoints() { return this.checkpoints.length; }
+  get currentCheckpointIndex() { return this.nextCP; }
 
-  constructor(centerline: readonly CenterlinePoint[], scene?: Scene) {
-    // Place 8 checkpoints evenly along the track
-    const numCheckpoints = 8;
-    const spacing = Math.max(1, Math.floor(centerline.length / numCheckpoints));
+  constructor(centerline: { x: number; z: number; nx: number; nz: number }[], totalLaps: number) {
+    this._totalLaps = totalLaps;
 
-    for (let i = 0; i < numCheckpoints; i++) {
-      const idx = (i * spacing) % centerline.length;
+    // CP0 = Sector 1 (25%)  — first quarter of track
+    // CP1 = Sector 2 (50%)  — halfway
+    // CP2 = Sector 3 (75%)  — three quarters
+    // CP3 = FINISH   (3%)   — just ahead of spawn, on the start/finish straight
+    const offsets = [0.25, 0.50, 0.75, 0.03];
+    const labels = ['Sector 1', 'Sector 2', 'Sector 3', 'FINISH'];
+
+    for (let i = 0; i < offsets.length; i++) {
+      const idx = Math.floor(offsets[i]! * centerline.length) % centerline.length;
       const pt = centerline[idx]!;
-      this.checkpoints.push({ x: pt.x, z: pt.z, index: i });
-    }
 
-    console.log(`Checkpoints: ${this.checkpoints.length} placed, radius: ${this.detectionRadius}m`);
-    this.checkpoints.forEach((cp, i) => {
-      console.log(`  CP${i}: (${cp.x.toFixed(0)}, ${cp.z.toFixed(0)})`);
-    });
+      this.checkpoints.push({
+        x: pt.x,
+        z: pt.z,
+        isFinishLine: i === offsets.length - 1,
+        triggered: false,
+      });
 
-    // Create visible checkpoint markers
-    if (scene) {
-      this.createVisualMarkers(scene);
+      console.log(`CP${i} [${labels[i]}]: (${pt.x.toFixed(0)}, ${pt.z.toFixed(0)}) @ ${(offsets[i]! * 100).toFixed(0)}%`);
     }
   }
 
-  private createVisualMarkers(scene: Scene): void {
-    for (let i = 0; i < this.checkpoints.length; i++) {
-      const cp = this.checkpoints[i]!;
-      const next = this.checkpoints[(i + 1) % this.checkpoints.length]!;
-
-      // Direction arrow pointing toward next checkpoint
-      const dx = next.x - cp.x;
-      const dz = next.z - cp.z;
-      const angle = Math.atan2(dx, dz);
-
-      // Arrow shape — thin box as the line
-      const arrowMat = new StandardMaterial(`cpMat${i}`, scene);
-      arrowMat.diffuseColor = new Color3(0, 0.8, 1);
-      arrowMat.emissiveColor = new Color3(0, 0.4, 0.6);
-      arrowMat.alpha = 0.25;
-
-      const line = MeshBuilder.CreateBox(`cpLine${i}`, {
-        width: 6, height: 0.05, depth: 0.8,
-      }, scene);
-      line.material = arrowMat;
-      line.position.set(cp.x, 0.1, cp.z);
-      line.rotation.y = angle;
-      line.isPickable = false;
-
-      // Arrow head — small triangle (box rotated 45deg)
-      const head = MeshBuilder.CreateBox(`cpHead${i}`, {
-        width: 2, height: 0.05, depth: 2,
-      }, scene);
-      head.material = arrowMat;
-      head.position.set(
-        cp.x + Math.sin(angle) * 4,
-        0.1,
-        cp.z + Math.cos(angle) * 4,
-      );
-      head.rotation.y = angle + Math.PI / 4;
-      head.isPickable = false;
-    }
+  start(time: number) {
+    this._startTime = time;
+    this._lap = 1;
+    this.nextCP = 0;
+    this._finished = false;
+    this._finishTime = 0;
+    for (const cp of this.checkpoints) cp.triggered = false;
   }
 
-  get totalCheckpoints(): number { return this.checkpoints.length; }
-  get currentCheckpointIndex(): number { return this.nextCheckpoint; }
+  update(carX: number, carZ: number, time: number): boolean {
+    if (this._finished) return false;
+    if (this.checkpoints.length === 0) return false;
 
-  startRace(time: number): void {
-    this.raceStartTime = time;
-    this.lapStartTime = time;
-    this.currentLap = 1;
-    this.nextCheckpoint = 0;
-    this.finished = false;
-  }
-
-  update(carX: number, carZ: number, currentTime: number): void {
-    if (this.finished || this.checkpoints.length === 0) return;
-
-    const cp = this.checkpoints[this.nextCheckpoint]!;
+    const cp = this.checkpoints[this.nextCP]!;
     const dx = carX - cp.x;
     const dz = carZ - cp.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
+    const distSq = dx * dx + dz * dz;
 
-    if (dist < this.detectionRadius) {
-      console.log(`Checkpoint ${this.nextCheckpoint} hit! (dist: ${dist.toFixed(1)}m) Lap: ${this.currentLap}`);
-      this.onCheckpointHit?.(this.nextCheckpoint, this.currentLap);
-      this.nextCheckpoint++;
+    if (!cp.triggered && distSq < TRIGGER_RADIUS * TRIGGER_RADIUS) {
+      cp.triggered = true;
+      this.onCheckpoint?.(this.nextCP, this._lap);
+      this.nextCP++;
 
-      if (this.nextCheckpoint >= this.checkpoints.length) {
-        const lapTime = currentTime - this.lapStartTime;
-        this.onLapComplete?.(this.currentLap, lapTime);
-        console.log(`Lap ${this.currentLap} complete! Time: ${lapTime.toFixed(2)}s`);
+      if (this.nextCP >= this.checkpoints.length) {
+        this.onLapDone?.(this._lap);
 
-        if (this.currentLap >= this.totalLaps) {
-          this.finished = true;
-          this.finishTime = currentTime - this.raceStartTime;
-          console.log(`RACE FINISHED! Total time: ${this.finishTime.toFixed(2)}s`);
-          this.onRaceFinish?.(this.finishTime);
-        } else {
-          this.currentLap++;
-          this.nextCheckpoint = 0;
-          this.lapStartTime = currentTime;
+        if (this._lap >= this._totalLaps) {
+          this._finished = true;
+          this._finishTime = time - this._startTime;
+          this.onFinish?.(this._finishTime);
+          return true;
         }
+
+        this._lap++;
+        this.nextCP = 0;
       }
     }
+
+    // Reset trigger when car leaves the zone
+    if (cp.triggered && distSq > RESET_RADIUS * RESET_RADIUS) {
+      cp.triggered = false;
+    }
+
+    return false;
   }
 
   getProgress(carX: number, carZ: number): number {
-    if (this.finished) return this.currentLap * this.checkpoints.length + this.checkpoints.length;
-
-    const total = this.checkpoints.length;
-    const baseProgress = (this.currentLap - 1) * total + this.nextCheckpoint;
-
-    if (this.nextCheckpoint < total) {
-      const cp = this.checkpoints[this.nextCheckpoint]!;
-      const prevIdx = this.nextCheckpoint > 0 ? this.nextCheckpoint - 1 : total - 1;
-      const prev = this.checkpoints[prevIdx]!;
-      const segLen = Math.sqrt((cp.x - prev.x) ** 2 + (cp.z - prev.z) ** 2);
-      if (segLen > 0.1) {
-        const carDist = Math.sqrt((carX - prev.x) ** 2 + (carZ - prev.z) ** 2);
-        return baseProgress + Math.min(carDist / segLen, 1);
-      }
-    }
-
-    return baseProgress;
+    if (this._finished) return 999999;
+    return (this._lap - 1) * this.checkpoints.length + this.nextCP;
   }
 }

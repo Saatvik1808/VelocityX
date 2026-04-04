@@ -5,6 +5,9 @@
  * (you might spin out) but rewards you with a speed boost. Holding
  * the drift longer gives bigger boosts (3 charge levels).
  *
+ * Charge times are fast so the system feels responsive and fun.
+ * Boost multipliers are strong so you FEEL the speed kick.
+ *
  * Key concepts: charge accumulation, boost levels, speed multiplier, risk-reward
  */
 
@@ -17,6 +20,7 @@ export class DriftSystem {
   boostActive = false;
   boostTimeRemaining = 0;
   boostMultiplier = 0;
+  boostJustActivated = false;
 
   private wasDrifting = false;
 
@@ -26,11 +30,13 @@ export class DriftSystem {
    */
   update(input: InputState, speed: number, dt: number): number {
     const absSpeed = Math.abs(speed);
-    const isDrifting = input.drift && absSpeed > 3;
+    const isDrifting = input.drift && absSpeed > 2;
 
-    // Accumulate drift charge
+    // Accumulate drift charge — faster when actually turning (more fun)
     if (isDrifting) {
-      this.chargeTime += dt;
+      // Charge faster when steering (real drifting, not just holding Space straight)
+      const steerBonus = (input.steerLeft || input.steerRight) ? 1.5 : 0.8;
+      this.chargeTime += dt * steerBonus;
 
       // Determine charge level
       if (this.chargeTime >= DRIFT_BOOST.LEVEL_3_TIME) {
@@ -51,7 +57,7 @@ export class DriftSystem {
 
     this.wasDrifting = isDrifting;
 
-    // Reset charge if not drifting
+    // Reset charge if not drifting and no active boost
     if (!isDrifting && !this.boostActive) {
       this.chargeTime = 0;
       this.boostLevel = 0;
@@ -73,6 +79,7 @@ export class DriftSystem {
 
   private activateBoost(): void {
     this.boostActive = true;
+    this.boostJustActivated = true;
 
     switch (this.boostLevel) {
       case 1:

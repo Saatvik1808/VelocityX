@@ -94,22 +94,22 @@ export const ENGINE = {
 
 export const CAMERA = {
   /** Distance behind the car in meters. */
-  DISTANCE: 8.0,
+  DISTANCE: 10.0,
   /** Height above the car in meters. */
-  HEIGHT: 3.0,
+  HEIGHT: 4.5,
   /** Spring stiffness for position smoothing. Very high = locked to car. */
   STIFFNESS: 12.0,
   /** Damping ratio for position smoothing. */
   DAMPING: 0.95,
   /** FOV (degrees) — fixed, no zoom. */
-  FOV_MIN: 65,
-  FOV_MAX: 65,
+  FOV_MIN: 60,
+  FOV_MAX: 60,
   /** Speed range (m/s) over which FOV interpolates. */
   FOV_SPEED_RANGE: [0, 50] as readonly [number, number],
   /** Look-ahead distance along car forward vector (meters). */
-  LOOK_AHEAD: 2.0,
+  LOOK_AHEAD: 5.0,
   /** Smoothing time for camera rotation (seconds). Lower = snappier. */
-  ROTATION_SMOOTHING: 0.1,
+  ROTATION_SMOOTHING: 0.08,
 } as const;
 
 export const RENDERING = {
@@ -195,13 +195,14 @@ export const CHECKPOINTS = {
 
 export const DRIFT_BOOST = {
   DRIFT_ANGLE_THRESHOLD: Math.PI / 6,
-  LEVEL_1_TIME: 0.3,
-  LEVEL_1_DURATION: 1.0,
-  LEVEL_1_MULTIPLIER: 0.15,
-  LEVEL_2_TIME: 1.2,
-  LEVEL_2_DURATION: 1.5,
-  LEVEL_2_MULTIPLIER: 0.25,
-  LEVEL_3_TIME: 2.5,
-  LEVEL_3_DURATION: 2.5,
-  LEVEL_3_MULTIPLIER: 0.40,
+  /** Charge times — how long you must hold drift to reach each level */
+  LEVEL_1_TIME: 0.2,
+  LEVEL_1_DURATION: 1.2,
+  LEVEL_1_MULTIPLIER: 0.35,
+  LEVEL_2_TIME: 0.8,
+  LEVEL_2_DURATION: 2.0,
+  LEVEL_2_MULTIPLIER: 0.6,
+  LEVEL_3_TIME: 1.8,
+  LEVEL_3_DURATION: 3.0,
+  LEVEL_3_MULTIPLIER: 1.0,
 } as const;

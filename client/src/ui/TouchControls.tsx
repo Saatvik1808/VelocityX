@@ -73,6 +73,7 @@ export function TouchControls() {
       touchState.steerLeft = false;
       touchState.steerRight = false;
       touchState.drift = false;
+      touchState.nitro = false;
     };
     window.addEventListener('blur', clearAll);
     return () => {
@@ -88,6 +89,7 @@ export function TouchControls() {
   const accel = useTouchButton('accelerate');
   const brake = useTouchButton('brake');
   const drift = useTouchButton('drift');
+  const nitro = useTouchButton('nitro');
 
   return (
     <div style={{
@@ -184,13 +186,13 @@ export function TouchControls() {
         BRK
       </div>
 
-      {/* CENTER — Drift */}
+      {/* CENTER-LEFT — Drift */}
       <div
         style={{
           ...btnBase,
-          left: '50%', bottom: 20,
+          left: '40%', bottom: 20,
           transform: 'translateX(-50%)',
-          width: 100, height: 44,
+          width: 90, height: 44,
           borderRadius: 22,
           background: drift.pressed ? 'rgba(255,150,0,0.3)' : 'rgba(255,150,0,0.08)',
           border: drift.pressed ? '2px solid rgba(255,150,0,0.5)' : '2px solid rgba(255,150,0,0.15)',
@@ -206,6 +208,31 @@ export function TouchControls() {
         onMouseLeave={drift.onUp}
       >
         DRIFT
+      </div>
+
+      {/* CENTER-RIGHT — NOS */}
+      <div
+        style={{
+          ...btnBase,
+          left: '60%', bottom: 20,
+          transform: 'translateX(-50%)',
+          width: 90, height: 44,
+          borderRadius: 22,
+          background: nitro.pressed ? 'rgba(0,150,255,0.3)' : 'rgba(0,150,255,0.08)',
+          border: nitro.pressed ? '2px solid rgba(0,180,255,0.5)' : '2px solid rgba(0,150,255,0.15)',
+          color: nitro.pressed ? '#00ccff' : 'rgba(0,150,255,0.5)',
+          fontSize: 12,
+          letterSpacing: 2,
+          fontWeight: 800,
+        }}
+        onTouchStart={nitro.onDown}
+        onTouchEnd={nitro.onUp}
+        onTouchCancel={nitro.onUp}
+        onMouseDown={nitro.onDown}
+        onMouseUp={nitro.onUp}
+        onMouseLeave={nitro.onUp}
+      >
+        NOS
       </div>
     </div>
   );

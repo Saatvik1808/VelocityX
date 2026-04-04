@@ -10,7 +10,7 @@
 
 import { Vector3, Quaternion } from '@babylonjs/core';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { PHYSICS } from '@neon-drift/shared';
+import { PHYSICS, TRACK } from '@neon-drift/shared';
 
 import { Renderer } from './Renderer.js';
 import { SceneManager } from './SceneManager.js';
@@ -30,6 +30,7 @@ import { SparkEmitter } from '../particles/SparkEmitter.js';
 import { SkidMarkRenderer } from '../track/SkidMarkRenderer.js';
 import { CheckpointSystem } from '../track/Checkpoints.js';
 import { DriftSystem } from '../vehicles/DriftSystem.js';
+import { NitroSystem } from '../vehicles/NitroSystem.js';
 import { NetworkManager } from '../network/NetworkManager.js';
 import { EntityInterpolation } from '../network/EntityInterpolation.js';
 import { RemoteVehicle } from '../network/RemoteVehicle.js';
@@ -67,6 +68,8 @@ export class Game {
   // Gameplay
   private checkpointSystem: CheckpointSystem | null = null;
   private driftSystem = new DriftSystem();
+  private nitroSystem = new NitroSystem();
+  private raceFinished = false;
 
   // Multiplayer
   private networkManager: NetworkManager | null = null;
@@ -95,46 +98,25 @@ export class Game {
     // 5. Build track
     this.trackBuilder = new TrackBuilder(scene);
 
-    // 5b. Create checkpoint system
-    this.checkpointSystem = new CheckpointSystem(this.trackBuilder.getCenterline(), scene);
-    this.checkpointSystem.startRace(0);
+    // 5b. Create checkpoint system — invisible distance-based zones
+    const cl = this.trackBuilder.getCenterline();
+    const centerlineForCP = cl.map(p => ({ x: p.x, z: p.z, nx: p.nx, nz: p.nz }));
+    this.checkpointSystem = new CheckpointSystem(centerlineForCP, 3);
+    this.checkpointSystem.start(0);
     useGameStore.getState().setTotalCheckpoints(this.checkpointSystem.totalCheckpoints);
 
-    this.checkpointSystem.onCheckpointHit = (index, lap) => {
-      const store = useGameStore.getState();
-      store.setCurrentCheckpoint(index);
-      store.setLap(lap);
-
-      // Send checkpoint to server
+    this.checkpointSystem.onCheckpoint = (cp, lap) => {
+      useGameStore.getState().setCurrentCheckpoint(cp);
+      useGameStore.getState().setLap(lap);
+      // Notify server
       const nm = (window as any).__networkManager;
       if (nm?.connected) {
-        nm.socket?.emit('CLIENT_CHECKPOINT_HIT', { checkpointIndex: index, lapNumber: lap });
+        nm.socket?.emit('CLIENT_CHECKPOINT_HIT', { checkpointIndex: cp, lapNumber: lap });
       }
     };
 
-    this.checkpointSystem.onLapComplete = (lap, lapTime) => {
-      console.log(`Lap ${lap} complete: ${lapTime.toFixed(2)}s`);
-    };
-
-    this.checkpointSystem.onRaceFinish = (totalTime) => {
-      console.log(`Race finished! Time: ${totalTime.toFixed(2)}s`);
-      const store = useGameStore.getState();
-
-      // Show results
-      const myName = (window as any).__networkManager?.playerId?.slice(0, 6) ?? 'You';
-      store.setRaceResults([{
-        id: ((window as any).__networkManager?.playerId ?? 'local') as any,
-        name: myName,
-        time: totalTime,
-        position: 1,
-      }]);
-      store.setGamePhase('RESULTS');
-
-      // Send finish to server
-      const nm = (window as any).__networkManager;
-      if (nm?.connected) {
-        nm.socket?.emit('CLIENT_FINISHED', { time: totalTime });
-      }
+    this.checkpointSystem.onFinish = (totalTime) => {
+      this.finishRace(totalTime);
     };
 
     // 6. Build track colliders
@@ -288,7 +270,7 @@ export class Game {
 
     // Server sends full race results when all players finish
     this.networkManager.onRaceStart = () => {
-      this.checkpointSystem?.startRace(this.elapsed);
+      this.checkpointSystem?.start(this.elapsed);
       useGameStore.getState().setGamePhase('RACING');
     };
 
@@ -297,8 +279,42 @@ export class Game {
     };
   }
 
+  /** Immediately stop the car and show results */
+  private finishRace(totalTime: number): void {
+    console.log(`RACE OVER! Time: ${totalTime.toFixed(2)}s`);
+    this.raceFinished = true;
+
+    // Freeze the car IMMEDIATELY
+    if (this.vehiclePhysics) {
+      const chassis = this.vehiclePhysics.getChassisBody();
+      chassis.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      chassis.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      chassis.setBodyType(0, true); // 0 = Fixed — car becomes immovable
+    }
+
+    // Show results IMMEDIATELY
+    const store = useGameStore.getState();
+    const myName = (window as any).__networkManager?.playerId?.slice(0, 6) ?? 'You';
+    store.setRaceResults([{
+      id: ((window as any).__networkManager?.playerId ?? 'local') as any,
+      name: myName,
+      time: totalTime,
+      position: 1,
+    }]);
+    store.setGamePhase('RESULTS');
+
+    // Notify server
+    const nm = (window as any).__networkManager;
+    if (nm?.connected) {
+      nm.socket?.emit('CLIENT_FINISHED', { time: totalTime });
+    }
+  }
+
   private onFixedUpdate = (dt: number): void => {
     if (!this.inputManager || !this.vehiclePhysics || !this.world) return;
+
+    // Race finished — no more physics
+    if (this.raceFinished) return;
 
     // Save previous state for interpolation
     this.prevState = { ...this.currState };
@@ -333,6 +349,13 @@ export class Game {
   private onRender = (alpha: number): void => {
     if (!this.sceneManager || !this.vehiclePhysics || !this.vehicleVisuals ||
         !this.chaseCamera || !this.inputManager) return;
+
+    // Race finished — only render scene, skip all gameplay
+    if (this.raceFinished) {
+      this.trackEnvironment?.update(this.elapsed);
+      this.sceneManager.scene.render();
+      return;
+    }
 
     const dt = 1 / 60;
     this.elapsed += dt;
@@ -429,14 +452,28 @@ export class Game {
     // Speed-reactive post-processing
     this.postProcessing?.setSpeed(state.speed);
 
-    // Checkpoint detection — BEFORE HUD so results show instantly
-    this.checkpointSystem?.update(state.position.x, state.position.z, this.elapsed);
+    // Checkpoint detection — use visual position (which matches track coordinates)
+    const carVisualPos = this.vehicleVisuals.root.position;
+    const justFinished = this.checkpointSystem?.update(carVisualPos.x, carVisualPos.z, this.elapsed);
+
+    // Debug: log every 60 frames
+    if (Math.floor(this.elapsed * 60) % 60 === 0 && this.checkpointSystem) {
+      console.log(`Car: (${carVisualPos.x.toFixed(0)}, ${carVisualPos.z.toFixed(0)}) | NextCP: ${this.checkpointSystem.currentCheckpointIndex} | Lap: ${this.checkpointSystem.lap} | Finished: ${this.checkpointSystem.finished}`);
+    }
+
+    if (justFinished) {
+      // Double ensure — finishRace should already be called via callback
+      // but call it again just in case
+      if (!this.raceFinished) {
+        this.finishRace(this.checkpointSystem!.finishTime);
+      }
+    }
 
     // HUD
     const store = useGameStore.getState();
     store.setSpeed(state.speed * 3.6);
     store.setRaceTime(this.elapsed);
-    store.setPlayerWorldPos({ x: state.position.x, z: state.position.z });
+    store.setPlayerWorldPos({ x: carVisualPos.x, z: carVisualPos.z });
     store.setIsDrifting(input.drift && Math.abs(state.speed) > 3);
 
     // Dynamic position ranking
@@ -445,7 +482,7 @@ export class Game {
       store.setTotalRacers(totalRacers);
 
       if (this.remoteVehicles.size > 0) {
-        const myLap = this.checkpointSystem.currentLap;
+        const myLap = this.checkpointSystem.lap;
         const myCP = this.checkpointSystem.currentCheckpointIndex;
         let myPosition = 1;
 
@@ -454,7 +491,7 @@ export class Game {
           // Since we don't track remote checkpoints, use distance to next checkpoint
           const rp = rv.root.position;
           const remoteDist = this.checkpointSystem.getProgress(rp.x, rp.z);
-          const myDist = this.checkpointSystem.getProgress(state.position.x, state.position.z);
+          const myDist = this.checkpointSystem.getProgress(carVisualPos.x, carVisualPos.z);
 
           if (remoteDist > myDist) {
             myPosition++;
@@ -469,15 +506,47 @@ export class Game {
     const boostForce = this.driftSystem.update(input, state.speed, dt);
     store.setBoostLevel(this.driftSystem.boostLevel);
     store.setBoostActive(this.driftSystem.boostActive);
+    store.setIsDrifting(input.drift && Math.abs(state.speed) > 2);
 
-    // Apply boost force to car (extra engine force on rear wheels)
+    // Apply boost force — strong impulse in forward direction
     if (boostForce > 0 && this.vehiclePhysics) {
       const chassis = this.vehiclePhysics.getChassisBody();
       const rot = chassis.rotation();
-      // Forward direction from quaternion
       const fx = 2 * (rot.x * rot.z + rot.w * rot.y);
       const fz = 1 - 2 * (rot.x * rot.x + rot.y * rot.y);
-      chassis.applyImpulse({ x: fx * boostForce * dt, y: 0, z: fz * boostForce * dt }, true);
+      // Apply as a big impulse for punchy feel
+      const impulseScale = boostForce * dt * 1.5;
+      chassis.applyImpulse({ x: fx * impulseScale, y: 0, z: fz * impulseScale }, true);
+
+      // Camera effects on first frame of boost
+      if (this.driftSystem.boostJustActivated) {
+        const level = this.driftSystem.boostMultiplier;
+        this.chaseCamera?.shake(0.3 + level * 0.4);
+        this.chaseCamera?.fovKick(5 + level * 10); // FOV widens then snaps back
+        this.driftSystem.boostJustActivated = false;
+      }
+    }
+
+    // Nitro system (NFS-style limited boost)
+    const isDrifting = input.drift && Math.abs(state.speed) > 2;
+    const driftBoostJustFired = this.driftSystem.boostJustActivated;
+    const nitroForce = this.nitroSystem.update(input.nitro, isDrifting, driftBoostJustFired, state.speed, dt);
+    store.setNitroTank(this.nitroSystem.tankPercent);
+    store.setNitroActive(this.nitroSystem.active);
+
+    if (nitroForce > 0 && this.vehiclePhysics) {
+      const chassis = this.vehiclePhysics.getChassisBody();
+      const rot = chassis.rotation();
+      const fx = 2 * (rot.x * rot.z + rot.w * rot.y);
+      const fz = 1 - 2 * (rot.x * rot.x + rot.y * rot.y);
+      chassis.applyImpulse({ x: fx * nitroForce * dt, y: 0, z: fz * nitroForce * dt }, true);
+
+      // Camera effects on nitro activation
+      if (this.nitroSystem.justActivated) {
+        this.chaseCamera?.shake(0.3);
+        this.chaseCamera?.fovKick(8);
+        this.nitroSystem.justActivated = false;
+      }
     }
 
     // Check collisions between local car and remote cars

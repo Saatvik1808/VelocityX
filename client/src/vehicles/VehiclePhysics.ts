@@ -77,7 +77,7 @@ export class VehiclePhysics {
     this.chassisBody.setAdditionalMassProperties(
       0,
       { x: 0, y: CENTER_OF_MASS_Y_OFFSET, z: 0 },
-      { x: 800, y: 20, z: 800 },  // low Y = easy yaw, high X/Z = no roll/flip
+      { x: 800, y: 80, z: 800 },  // moderate Y = turns well but won't spin like a top
       { x: 0, y: 0, z: 0, w: 1 },
       false,
     );
@@ -183,13 +183,30 @@ export class VehiclePhysics {
       this.controller.setWheelBrake(i, brakeForce);
     }
 
-    // Drift: holding Space reduces rear wheel friction so the tail slides out
-    if (input.drift && absSpeed > 3) {
-      this.controller.setWheelFrictionSlip(2, WHEELS.REAR_FRICTION_SLIP * 0.4);
-      this.controller.setWheelFrictionSlip(3, WHEELS.REAR_FRICTION_SLIP * 0.4);
+    // Drift: holding Space reduces rear grip for controlled slides
+    if (input.drift && absSpeed > 2) {
+      // Moderate rear friction reduction — enough to slide, not enough to spin
+      this.controller.setWheelFrictionSlip(2, WHEELS.REAR_FRICTION_SLIP * 0.55);
+      this.controller.setWheelFrictionSlip(3, WHEELS.REAR_FRICTION_SLIP * 0.55);
+      // Boost front grip so steering stays responsive during drift
+      this.controller.setWheelFrictionSlip(0, WHEELS.FRONT_FRICTION_SLIP * 1.3);
+      this.controller.setWheelFrictionSlip(1, WHEELS.FRONT_FRICTION_SLIP * 1.3);
+
+      // Anti-spin: clamp angular velocity to prevent instant 180°
+      // This is the key to making drifts feel controlled vs chaotic
+      const angvel = this.chassisBody.angvel();
+      const maxYawRate = 2.5; // radians/sec — allows ~140°/sec rotation (fast but not instant spin)
+      if (Math.abs(angvel.y) > maxYawRate) {
+        this.chassisBody.setAngvel(
+          { x: angvel.x, y: Math.sign(angvel.y) * maxYawRate, z: angvel.z },
+          true,
+        );
+      }
     } else {
       this.controller.setWheelFrictionSlip(2, WHEELS.REAR_FRICTION_SLIP);
       this.controller.setWheelFrictionSlip(3, WHEELS.REAR_FRICTION_SLIP);
+      this.controller.setWheelFrictionSlip(0, WHEELS.FRONT_FRICTION_SLIP);
+      this.controller.setWheelFrictionSlip(1, WHEELS.FRONT_FRICTION_SLIP);
     }
   }
 

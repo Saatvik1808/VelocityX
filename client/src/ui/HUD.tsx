@@ -39,6 +39,8 @@ export function HUD() {
   const isDrifting = useGameStore((s) => s.isDrifting);
   const boostLevel = useGameStore((s) => s.boostLevel);
   const boostActive = useGameStore((s) => s.boostActive);
+  const nitroTank = useGameStore((s) => s.nitroTank);
+  const nitroActive = useGameStore((s) => s.nitroActive);
   const countdownSeconds = useGameStore((s) => s.countdownSeconds);
   const currentCheckpoint = useGameStore((s) => s.currentCheckpoint);
   const totalCheckpoints = useGameStore((s) => s.totalCheckpoints);
@@ -147,30 +149,96 @@ export function HUD() {
         </div>
       </div>
 
-      {/* Boost meter */}
-      {(boostLevel > 0 || boostActive) && (
+      {/* Boost meter — always visible when drifting or boosting */}
+      {(boostLevel > 0 || boostActive || isDrifting) && (
         <div style={{
           ...panel, position: 'absolute', bottom: 100, right: 14,
-          width: 130, padding: '8px 12px',
+          width: 140, padding: '10px 14px',
+          border: boostActive ? '1px solid rgba(255,100,0,0.6)' :
+            boostLevel === 3 ? '1px solid rgba(180,0,255,0.5)' :
+            '1px solid rgba(255,255,255,0.05)',
+          boxShadow: boostActive ? '0 0 20px rgba(255,100,0,0.3)' :
+            boostLevel === 3 ? '0 0 20px rgba(180,0,255,0.3)' : 'none',
         }}>
-          <div style={{ fontSize: 10, opacity: 0.4, letterSpacing: 1, marginBottom: 4 }}>BOOST</div>
-          <div style={{ width: '100%', height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize: 10, opacity: 0.5, letterSpacing: 2, marginBottom: 5, fontWeight: 700 }}>
+            {boostActive ? '⚡ BOOST' : isDrifting ? '🔥 DRIFT' : 'BOOST'}
+          </div>
+          <div style={{ width: '100%', height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.08)' }}>
             <div style={{
               width: boostActive ? '100%' : `${Math.min((boostLevel / 3) * 100, 100)}%`,
-              height: '100%', borderRadius: 3, transition: 'width 0.15s',
-              background: boostActive ? '#ff4400' :
-                boostLevel === 3 ? 'linear-gradient(90deg, #8800ff, #cc00ff)' :
-                boostLevel === 2 ? 'linear-gradient(90deg, #ff6600, #ffaa00)' :
-                'linear-gradient(90deg, #0066ff, #00aaff)',
+              height: '100%', borderRadius: 4, transition: 'width 0.1s ease-out',
+              background: boostActive ? 'linear-gradient(90deg, #ff4400, #ff8800)' :
+                boostLevel === 3 ? 'linear-gradient(90deg, #8800ff, #ff00ff)' :
+                boostLevel === 2 ? 'linear-gradient(90deg, #ff6600, #ffcc00)' :
+                boostLevel === 1 ? 'linear-gradient(90deg, #0088ff, #00ccff)' :
+                'linear-gradient(90deg, #333, #555)',
             }} />
           </div>
-          <div style={{ fontSize: 10, textAlign: 'center', marginTop: 3, opacity: 0.5, fontWeight: 700 }}>
-            {boostActive ? 'BOOST!' :
-              boostLevel === 3 ? 'MAX' :
-              boostLevel === 2 ? 'LVL 2' :
-              boostLevel === 1 ? 'LVL 1' : ''}
+          <div style={{
+            fontSize: 11, textAlign: 'center', marginTop: 4, fontWeight: 800, letterSpacing: 1,
+            color: boostActive ? '#ff6600' :
+              boostLevel === 3 ? '#cc44ff' :
+              boostLevel === 2 ? '#ffaa00' :
+              boostLevel === 1 ? '#00aaff' : '#666',
+          }}>
+            {boostActive ? 'BOOSTING!' :
+              boostLevel === 3 ? '★ MAX ★' :
+              boostLevel === 2 ? 'LEVEL 2' :
+              boostLevel === 1 ? 'LEVEL 1' :
+              isDrifting ? 'CHARGING...' : ''}
           </div>
         </div>
+      )}
+
+      {/* Nitro tank — left side, vertical bar */}
+      <div style={{
+        ...panel, position: 'absolute', bottom: 100, left: 14,
+        width: 50, padding: '8px 10px',
+        border: nitroActive ? '1px solid rgba(0,180,255,0.6)' : '1px solid rgba(255,255,255,0.05)',
+        boxShadow: nitroActive ? '0 0 20px rgba(0,180,255,0.3)' : 'none',
+      }}>
+        <div style={{ fontSize: 9, opacity: 0.5, letterSpacing: 1, marginBottom: 4, textAlign: 'center', fontWeight: 700 }}>
+          NOS
+        </div>
+        <div style={{
+          width: '100%', height: 60, borderRadius: 4,
+          background: 'rgba(255,255,255,0.06)',
+          position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            height: `${nitroTank * 100}%`,
+            borderRadius: 4,
+            transition: 'height 0.1s ease-out',
+            background: nitroActive
+              ? 'linear-gradient(0deg, #00aaff, #00ddff)'
+              : nitroTank > 0.6
+                ? 'linear-gradient(0deg, #0066ff, #00ccff)'
+                : nitroTank > 0.3
+                  ? 'linear-gradient(0deg, #ff8800, #ffcc00)'
+                  : 'linear-gradient(0deg, #ff2200, #ff6600)',
+          }} />
+        </div>
+        <div style={{
+          fontSize: 9, textAlign: 'center', marginTop: 3, fontWeight: 800, letterSpacing: 1,
+          color: nitroActive ? '#00ccff' : nitroTank < 0.15 ? '#ff4444' : '#888',
+        }}>
+          {nitroActive ? 'ON' : nitroTank < 0.15 ? 'LOW' : 'SHIFT'}
+        </div>
+      </div>
+
+      {/* Speed lines overlay during boost or nitro */}
+      {(boostActive || nitroActive) && (
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: nitroActive
+            ? 'radial-gradient(ellipse at center, transparent 40%, rgba(0,150,255,0.08) 100%)'
+            : 'radial-gradient(ellipse at center, transparent 40%, rgba(255,100,0,0.08) 100%)',
+          border: nitroActive
+            ? '2px solid rgba(0,150,255,0.15)'
+            : '2px solid rgba(255,100,0,0.15)',
+          borderRadius: 0,
+        }} />
       )}
 
       {/* Timer — bottom center */}
@@ -186,12 +254,11 @@ export function HUD() {
 
       {/* Controls — bottom left */}
       <div style={{
-        ...panel, position: 'absolute', bottom: 20, left: 14,
+        ...panel, position: 'absolute', bottom: 20, left: 80,
         fontSize: 11, opacity: 0.5, lineHeight: 1.8, padding: '8px 12px',
       }}>
-        <div><b>W</b> / <b>S</b> accelerate / brake</div>
-        <div><b>A</b> / <b>D</b> steer</div>
-        <div><b>SPACE</b> drift</div>
+        <div><b>W/S</b> gas/brake &nbsp; <b>A/D</b> steer</div>
+        <div><b>SPACE</b> drift &nbsp; <b>SHIFT</b> nitro</div>
       </div>
 
       {/* Leave room button */}

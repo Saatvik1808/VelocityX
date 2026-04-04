@@ -25,6 +25,8 @@ interface GameStore {
   isDrifting: boolean;
   boostLevel: number;
   boostActive: boolean;
+  nitroTank: number;      // 0-1 percentage
+  nitroActive: boolean;
   countdownSeconds: number;
   currentCheckpoint: number;
   totalCheckpoints: number;
@@ -42,6 +44,8 @@ interface GameStore {
   setIsDrifting: (drifting: boolean) => void;
   setBoostLevel: (level: number) => void;
   setBoostActive: (active: boolean) => void;
+  setNitroTank: (pct: number) => void;
+  setNitroActive: (active: boolean) => void;
   setCountdownSeconds: (s: number) => void;
   setCurrentCheckpoint: (cp: number) => void;
   setTotalCheckpoints: (total: number) => void;
@@ -62,6 +66,8 @@ export const useGameStore = create<GameStore>()((set) => ({
   isDrifting: false,
   boostLevel: 0,
   boostActive: false,
+  nitroTank: 1,
+  nitroActive: false,
   countdownSeconds: 0,
   currentCheckpoint: 0,
   totalCheckpoints: 0,
@@ -79,6 +85,8 @@ export const useGameStore = create<GameStore>()((set) => ({
   setIsDrifting: (drifting) => set({ isDrifting: drifting }),
   setBoostLevel: (level: number) => set({ boostLevel: level }),
   setBoostActive: (active: boolean) => set({ boostActive: active }),
+  setNitroTank: (pct: number) => set({ nitroTank: pct }),
+  setNitroActive: (active: boolean) => set({ nitroActive: active }),
   setCountdownSeconds: (s: number) => set({ countdownSeconds: s }),
   setCurrentCheckpoint: (cp: number) => set({ currentCheckpoint: cp }),
   setTotalCheckpoints: (total: number) => set({ totalCheckpoints: total }),

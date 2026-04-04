@@ -34,6 +34,7 @@ export class ChaseCamera {
   // Shake state
   private shakeIntensity = 0;
   private highSpeedShake = 0;
+  private boostFovKick = 0;
 
   constructor(scene: Scene) {
     this.camera = new FreeCamera('chase', new Vector3(0, 5, -10), scene);
@@ -70,9 +71,9 @@ export class ChaseCamera {
     this._currentPos.y = smoothDamp(this._currentPos.y, dy, this.velY, st * 0.5, dt);
     this._currentPos.z = smoothDamp(this._currentPos.z, dz, this.velZ, st, dt);
 
-    // Look-at target (slightly ahead)
+    // Look-at target (ahead of car, slightly raised for better road view)
     const lx = tx + this._fw.x * CAMERA.LOOK_AHEAD;
-    const ly = ty;
+    const ly = ty + 0.8;
     const lz = tz + this._fw.z * CAMERA.LOOK_AHEAD;
 
     const ls = CAMERA.ROTATION_SMOOTHING;
@@ -100,13 +101,23 @@ export class ChaseCamera {
     this.camera.position.copyFrom(this._currentPos);
     this.camera.setTarget(this._smoothLook);
 
-    // FOV: smooth widen with speed
-    const targetFov = remap(absSpeed, CAMERA.FOV_SPEED_RANGE[0], CAMERA.FOV_SPEED_RANGE[1],
-      CAMERA.FOV_MIN, CAMERA.FOV_MAX) * (Math.PI / 180);
-    this.camera.fov = lerp(this.camera.fov, targetFov, 0.005);
+    // FOV: smooth widen with speed + boost kick
+    const baseFov = remap(absSpeed, CAMERA.FOV_SPEED_RANGE[0], CAMERA.FOV_SPEED_RANGE[1],
+      CAMERA.FOV_MIN, CAMERA.FOV_MAX);
+    const targetFov = (baseFov + this.boostFovKick) * (Math.PI / 180);
+    this.camera.fov = lerp(this.camera.fov, targetFov, 0.05);
+
+    // Decay boost FOV kick
+    this.boostFovKick *= Math.exp(-3 * dt);
+    if (this.boostFovKick < 0.1) this.boostFovKick = 0;
   }
 
   shake(intensity: number): void {
     this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
+  }
+
+  /** FOV kick for boost — widens then snaps back */
+  fovKick(degrees: number): void {
+    this.boostFovKick = degrees;
   }
 }
