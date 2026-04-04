@@ -35,12 +35,12 @@ export const WHEELS = {
   WIDTH: 0.22,
   /** Suspension spring rest length. */
   SUSPENSION_REST_LENGTH: 0.3,
-  /** Suspension spring stiffness (N/m). */
-  SUSPENSION_STIFFNESS: 35.0,
+  /** Suspension spring stiffness (N/m). Softer = smoother ride, less jitter. */
+  SUSPENSION_STIFFNESS: 25.0,
   /** Suspension compression damping. */
-  SUSPENSION_COMPRESSION: 4.5,
+  SUSPENSION_COMPRESSION: 4.0,
   /** Suspension relaxation (rebound) damping. */
-  SUSPENSION_RELAXATION: 2.8,
+  SUSPENSION_RELAXATION: 3.0,
   /** Maximum suspension travel in meters. */
   MAX_SUSPENSION_TRAVEL: 0.2,
   /** Maximum force the suspension can exert. */
@@ -75,8 +75,8 @@ export const STEERING = {
   SPEED_SENSITIVE_MIN: 0.4,
   /** Speed (m/s) at which steering reaches its minimum multiplier. */
   SPEED_SENSITIVE_FULL: 55,
-  /** Angular damping on the chassis. */
-  ANGULAR_DAMPING: 3.0,
+  /** Angular damping on the chassis. Lower = smoother turns. */
+  ANGULAR_DAMPING: 2.0,
 } as const;
 
 export const ENGINE = {
@@ -97,8 +97,8 @@ export const CAMERA = {
   DISTANCE: 10.0,
   /** Height above the car in meters. */
   HEIGHT: 4.5,
-  /** Spring stiffness for position smoothing. Very high = locked to car. */
-  STIFFNESS: 12.0,
+  /** Spring stiffness for position smoothing. Lower = smoother follow. */
+  STIFFNESS: 7.0,
   /** Damping ratio for position smoothing. */
   DAMPING: 0.95,
   /** FOV (degrees) — fixed, no zoom. */
@@ -108,8 +108,8 @@ export const CAMERA = {
   FOV_SPEED_RANGE: [0, 50] as readonly [number, number],
   /** Look-ahead distance along car forward vector (meters). */
   LOOK_AHEAD: 5.0,
-  /** Smoothing time for camera rotation (seconds). Lower = snappier. */
-  ROTATION_SMOOTHING: 0.08,
+  /** Smoothing time for camera rotation (seconds). Higher = smoother. */
+  ROTATION_SMOOTHING: 0.14,
 } as const;
 
 export const RENDERING = {
@@ -124,17 +124,17 @@ export const RENDERING = {
 } as const;
 
 export const TRACK_COLORS = {
-  CURB_RED: 0xcc2222,
-  CURB_WHITE: 0xeeeeee,
-  BARRIER_CONCRETE: 0xaaaaaa,
-  START_FINISH: 0xeeeeee,
-  START_FINISH_EMISSIVE: 0x228833,
-  START_FINISH_EMISSIVE_INTENSITY: 1.0,
-  STREETLIGHT_COLOR: 0xffd699,
-  STREETLIGHT_INTENSITY: 3.0,
-  STREETLIGHT_DISTANCE: 40,
+  CURB_CYAN: 0x00ffff,
+  CURB_MAGENTA: 0xff00ff,
+  BARRIER_NEON: 0x00ffff,
+  START_FINISH: 0x111111,
+  START_FINISH_EMISSIVE: 0x00ffff,
+  START_FINISH_EMISSIVE_INTENSITY: 1.5,
+  STREETLIGHT_COLOR: 0x00ffff,
+  STREETLIGHT_INTENSITY: 5.0,
+  STREETLIGHT_DISTANCE: 50,
   STREETLIGHT_DECAY: 1.5,
-  STREETLIGHT_POLE_COLOR: 0x555555,
+  STREETLIGHT_POLE_COLOR: 0x111111,
 } as const;
 
 export const TRACK = {
@@ -153,7 +153,7 @@ export const TRACK = {
 } as const;
 
 export const ENVIRONMENT = {
-  BUILDING_COUNT: 70,
+  BUILDING_COUNT: 120,
   TREE_COUNT: 60,
   BRIDGE_HEIGHT: 8.0,
   BRIDGE_WIDTH: 12.0,

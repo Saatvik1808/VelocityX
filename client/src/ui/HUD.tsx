@@ -9,7 +9,8 @@ const panel: React.CSSProperties = {
   background: 'rgba(8, 8, 16, 0.65)',
   backdropFilter: 'blur(8px)',
   borderRadius: 10,
-  border: '1px solid rgba(255, 255, 255, 0.06)',
+  border: '1px solid rgba(0, 255, 255, 0.2)',
+  boxShadow: 'inset 0 0 30px rgba(0,255,255,0.03)',
   padding: '10px 14px',
   color: '#ffffff',
   fontFamily: "'Segoe UI', system-ui, sans-serif",
@@ -77,7 +78,7 @@ export function HUD() {
         <div style={{
           position: 'absolute', top: '38%', left: '50%', transform: 'translateX(-50%)',
           fontSize: 26, fontWeight: 800, letterSpacing: 6,
-          color: '#ff6600', textShadow: '0 0 20px rgba(255,102,0,0.6)',
+          color: '#00ffff', textShadow: '0 0 20px rgba(0,255,255,0.6), 0 0 40px rgba(0,255,255,0.3)',
         }}>
           DRIFT!
         </div>
@@ -88,7 +89,7 @@ export function HUD() {
         <div style={{
           position: 'absolute', top: '30%', left: '50%', transform: 'translateX(-50%)',
           fontSize: 140, fontWeight: 900, color: '#fff',
-          textShadow: '0 0 60px rgba(255,200,0,0.5)',
+          textShadow: '0 0 60px rgba(0,255,255,0.5), 0 0 120px rgba(255,0,255,0.3)',
         }}>
           {countdownSeconds}
         </div>
@@ -106,7 +107,7 @@ export function HUD() {
       <div style={{ ...panel, position: 'absolute', top: 14, left: 14, padding: '6px 8px' }}>
         <svg width="140" height="100" viewBox="-10 -10 160 130" style={{ display: 'block' }}>
           {trackSVG && (
-            <path d={trackSVG} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinejoin="round" />
+            <path d={trackSVG} fill="none" stroke="rgba(0,255,255,0.5)" strokeWidth="2" strokeLinejoin="round" />
           )}
           <circle cx={playerPos.x * 0.3 + 70} cy={-playerPos.z * 0.3 + 55} r="3.5" fill="#00ccff" />
         </svg>
@@ -144,7 +145,7 @@ export function HUD() {
         <div style={{ width: '100%', height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)' }}>
           <div style={{
             width: `${speedPct}%`, height: '100%', borderRadius: 2, transition: 'width 0.1s',
-            background: speedPct < 40 ? '#44cc44' : speedPct < 70 ? '#cccc44' : '#cc4444',
+            background: speedPct < 40 ? '#00ffff' : speedPct < 70 ? '#ff00ff' : '#ff0044',
           }} />
         </div>
       </div>

@@ -1,11 +1,11 @@
 /**
- * LEARNING NOTE: Production Scene Lighting (Babylon.js)
+ * LEARNING NOTE: Neon Cyberpunk Scene Lighting (Babylon.js)
  *
- * Production lighting uses: cascaded shadow maps for soft shadows at
- * multiple distances, HDR image-based lighting for realistic ambient,
- * and separated sun/fill/hemisphere lights for depth and warmth.
+ * Dark atmospheric scene with deep blacks and neon-tinted ambient light.
+ * Low-intensity directional lights preserve darkness while neon emissives
+ * pop. Dense fog adds depth and glow diffusion for that cyberpunk look.
  *
- * Key concepts: CascadedShadowGenerator, environment intensity, PBR lighting
+ * Key concepts: dark scene setup, colored fog, ambient neon lighting
  */
 
 import {
@@ -26,7 +26,8 @@ export class SceneManager {
 
   constructor(engine: Engine) {
     this.scene = new Scene(engine);
-    this.scene.clearColor = new Color4(0.53, 0.68, 0.80, 1.0);
+    // Deep dark sky — almost black with slight purple tint
+    this.scene.clearColor = new Color4(0.02, 0.01, 0.05, 1.0);
 
     // Performance optimizations
     this.scene.autoClear = false;
@@ -34,63 +35,73 @@ export class SceneManager {
     this.scene.skipPointerMovePicking = true;
     this.scene.blockMaterialDirtyMechanism = true;
 
-    // PBR environment intensity
-    this.scene.environmentIntensity = 0.8;
+    // Moderate environment intensity — dark mood but PBR materials pick up neon reflections
+    this.scene.environmentIntensity = 0.5;
 
     this.setupLights();
     this.setupFog();
   }
 
   private setupLights(): void {
-    // Main sun — warm golden, low angle for long shadows
-    const sunLight = new DirectionalLight(
-      'sun',
-      new Vector3(0.5, -0.4, -0.8).normalize(),
+    // Moonlight — cold blue, very dim
+    const moonLight = new DirectionalLight(
+      'moon',
+      new Vector3(0.3, -0.6, -0.5).normalize(),
       this.scene,
     );
-    sunLight.intensity = 2.5;
-    sunLight.diffuse = new Color3(1.0, 0.92, 0.75);
-    sunLight.specular = new Color3(1.0, 0.95, 0.88);
-    sunLight.position = new Vector3(-80, 60, 100);
+    moonLight.intensity = 1.2;
+    moonLight.diffuse = new Color3(0.35, 0.4, 0.65);   // brighter cold blue moonlight
+    moonLight.specular = new Color3(0.45, 0.5, 0.75);
+    moonLight.position = new Vector3(-80, 60, 100);
 
-    // Shadow generator — skip on mobile for performance
+    // Shadow generator
     const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
     if (isMobile) {
-      // No shadows on mobile — too expensive
+      // No shadows on mobile
     } else try {
-      this.shadowGenerator = new ShadowGenerator(1024, sunLight);
+      this.shadowGenerator = new ShadowGenerator(1024, moonLight);
       this.shadowGenerator.usePercentageCloserFiltering = true;
       this.shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_LOW;
       this.shadowGenerator.bias = 0.001;
       this.shadowGenerator.normalBias = 0.02;
-      this.shadowGenerator.darkness = 0.5;
+      this.shadowGenerator.darkness = 0.85;  // very dark shadows
       this.shadowGenerator.transparencyShadow = true;
     } catch (e) {
       console.warn('Shadow generator failed:', e);
     }
 
-    // Cool fill light from opposite side
+    // Neon ambient fill — faint magenta/cyan mix
     const fillLight = new DirectionalLight(
       'fill',
       new Vector3(-0.4, -0.15, 0.6).normalize(),
       this.scene,
     );
-    fillLight.intensity = 0.25;
-    fillLight.diffuse = new Color3(0.6, 0.7, 0.9);
-    fillLight.specular = Color3.Black(); // no specular from fill
+    fillLight.intensity = 0.35;
+    fillLight.diffuse = new Color3(0.25, 0.12, 0.45);   // visible purple fill
+    fillLight.specular = Color3.Black();
 
-    // Hemisphere — sky/ground gradient
+    // Rim/backlight — cool blue edge highlight that outlines geometry
+    const rimLight = new DirectionalLight(
+      'rim',
+      new Vector3(0.5, -0.3, -0.8).normalize(),
+      this.scene,
+    );
+    rimLight.intensity = 0.25;
+    rimLight.diffuse = new Color3(0.1, 0.3, 0.5);
+    rimLight.specular = new Color3(0.2, 0.4, 0.6);
+
+    // Hemisphere — dark sky with neon ground bounce
     const hemiLight = new HemisphericLight('hemi', new Vector3(0, 1, 0), this.scene);
-    hemiLight.intensity = 0.35;
-    hemiLight.diffuse = new Color3(0.6, 0.8, 1.0);
-    hemiLight.groundColor = new Color3(0.4, 0.35, 0.2);
+    hemiLight.intensity = 0.4;
+    hemiLight.diffuse = new Color3(0.08, 0.08, 0.2);    // dark blue sky
+    hemiLight.groundColor = new Color3(0.15, 0.04, 0.2); // purple ground bounce
     hemiLight.specular = Color3.Black();
   }
 
   private setupFog(): void {
     this.scene.fogMode = Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = 0.0004; // Very light fog — distant objects visible
-    this.scene.fogColor = new Color3(0.7, 0.78, 0.85);
+    this.scene.fogDensity = 0.0008;  // lighter fog — see further into the city
+    this.scene.fogColor = new Color3(0.04, 0.02, 0.08);  // purple-tinted atmospheric fog
   }
 
   addShadowCaster(mesh: AbstractMesh): void {

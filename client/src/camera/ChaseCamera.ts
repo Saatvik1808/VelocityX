@@ -68,7 +68,7 @@ export class ChaseCamera {
     // Smooth damp position
     const st = 1.0 / CAMERA.STIFFNESS;
     this._currentPos.x = smoothDamp(this._currentPos.x, dx, this.velX, st, dt);
-    this._currentPos.y = smoothDamp(this._currentPos.y, dy, this.velY, st * 0.5, dt);
+    this._currentPos.y = smoothDamp(this._currentPos.y, dy, this.velY, st * 0.7, dt);
     this._currentPos.z = smoothDamp(this._currentPos.z, dz, this.velZ, st, dt);
 
     // Look-at target (ahead of car, slightly raised for better road view)

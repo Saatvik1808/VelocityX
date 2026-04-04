@@ -1,10 +1,11 @@
 /**
- * LEARNING NOTE: Production Vehicle Effects (Babylon.js)
+ * LEARNING NOTE: Neon Vehicle Effects (Babylon.js)
  *
- * SpotLights for headlights with visible beam cones. Brake light
- * modulation via PBR emissive color. All using pre-allocated Color3.
+ * Cyan neon headlight beams, magenta brake lights. The headlight
+ * cones are tinted cyan for the cyberpunk look. All emissive colors
+ * are neon-saturated.
  *
- * Key concepts: SpotLight, PBR emissive, volumetric beam cones
+ * Key concepts: colored SpotLights, neon beam cones, brake modulation
  */
 
 import {
@@ -23,16 +24,16 @@ export class VehicleEffects {
   private headlights: SpotLight[] = [];
   private beamCones: Mesh[] = [];
   private tailLightMaterials: PBRMaterial[] = [];
-  private readonly brakeColor = new Color3(1.0, 0.15, 0.1);
-  private readonly idleColor = new Color3(0.4, 0, 0);
+  private readonly brakeColor = new Color3(1.0, 0, 0.6);     // neon magenta brake
+  private readonly idleColor = new Color3(0.4, 0, 0.25);     // dim magenta idle
 
   constructor(scene: Scene, vehicleRoot: TransformNode) {
     const hz = VEHICLE.CHASSIS_HALF_EXTENTS.z;
 
     const beamMat = new PBRMaterial('beamMat', scene);
-    beamMat.albedoColor = new Color3(1.0, 0.95, 0.85);
-    beamMat.emissiveColor = new Color3(0.08, 0.07, 0.06);
-    beamMat.alpha = 0.025;
+    beamMat.albedoColor = new Color3(0, 0.8, 0.8);    // cyan tint
+    beamMat.emissiveColor = new Color3(0, 0.2, 0.2);
+    beamMat.alpha = 0.06;
     beamMat.backFaceCulling = false;
     beamMat.disableLighting = true;
     beamMat.freeze();
@@ -40,18 +41,18 @@ export class VehicleEffects {
     for (const x of [-0.55, 0.55]) {
       const hl = new SpotLight('hl', new Vector3(x, 0.1, hz + 0.15),
         new Vector3(0, -0.08, 1).normalize(), Math.PI / 6, 2, scene);
-      hl.diffuse = new Color3(1.0, 0.93, 0.87);
-      hl.intensity = 4.0;
-      hl.range = 60;
+      hl.diffuse = new Color3(0, 0.9, 1.0);   // cyan headlights
+      hl.intensity = 8.0;
+      hl.range = 80;
       hl.parent = vehicleRoot;
       this.headlights.push(hl);
 
       const cone = MeshBuilder.CreateCylinder('beam', {
-        diameterTop: 0.15, diameterBottom: 3.5, height: 12, tessellation: 4,
+        diameterTop: 0.15, diameterBottom: 4.5, height: 16, tessellation: 4,
       }, scene);
       cone.material = beamMat;
       cone.rotation.x = Math.PI / 2 + 0.08;
-      cone.position.set(x, 0.1, hz + 6.5);
+      cone.position.set(x, 0.1, hz + 8.5);
       cone.isPickable = false;
       cone.parent = vehicleRoot;
       this.beamCones.push(cone);

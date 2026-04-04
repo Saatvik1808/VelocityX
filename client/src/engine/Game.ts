@@ -28,6 +28,7 @@ import { PostProcessingStack } from '../rendering/PostProcessingStack.js';
 import { TireSmokeEmitter } from '../particles/TireSmokeEmitter.js';
 import { SparkEmitter } from '../particles/SparkEmitter.js';
 import { SkidMarkRenderer } from '../track/SkidMarkRenderer.js';
+import { TronTrailRenderer } from '../vehicles/TronTrailRenderer.js';
 import { CheckpointSystem } from '../track/Checkpoints.js';
 import { DriftSystem } from '../vehicles/DriftSystem.js';
 import { NitroSystem } from '../vehicles/NitroSystem.js';
@@ -55,6 +56,7 @@ export class Game {
   private tireSmokeEmitter: TireSmokeEmitter | null = null;
   private sparkEmitter: SparkEmitter | null = null;
   private skidMarkRenderer: SkidMarkRenderer | null = null;
+  private tronTrail: TronTrailRenderer | null = null;
 
   private elapsed = 0;
   private prevSpeed = 0;
@@ -213,6 +215,9 @@ export class Game {
 
     // 17. Skid marks
     this.skidMarkRenderer = new SkidMarkRenderer(scene);
+
+    // 17b. Tron light trail
+    this.tronTrail = new TronTrailRenderer(scene);
 
     // 18. Input — disable Babylon.js keyboard interception
     scene.detachControl();
@@ -379,11 +384,35 @@ export class Game {
     const ly = p.py + (c.py - p.py) * a;
     const lz = p.pz + (c.pz - p.pz) * a;
 
-    // Quaternion SLERP approximation (normalize after lerp)
-    let qx = p.rx + (c.rx - p.rx) * a;
-    let qy = p.ry + (c.ry - p.ry) * a;
-    let qz = p.rz + (c.rz - p.rz) * a;
-    let qw = p.rw + (c.rw - p.rw) * a;
+    // Proper quaternion SLERP for smooth rotation interpolation
+    // Dot product to check if quaternions are on the same hemisphere
+    let dot = p.rx * c.rx + p.ry * c.ry + p.rz * c.rz + p.rw * c.rw;
+    // If dot < 0, negate one quaternion to take the short path
+    let crx = c.rx, cry = c.ry, crz = c.rz, crw = c.rw;
+    if (dot < 0) {
+      dot = -dot;
+      crx = -crx; cry = -cry; crz = -crz; crw = -crw;
+    }
+
+    let qx: number, qy: number, qz: number, qw: number;
+    if (dot > 0.9995) {
+      // Very close — use normalized LERP (NLERP) to avoid division by near-zero sin
+      qx = p.rx + (crx - p.rx) * a;
+      qy = p.ry + (cry - p.ry) * a;
+      qz = p.rz + (crz - p.rz) * a;
+      qw = p.rw + (crw - p.rw) * a;
+    } else {
+      // Full SLERP
+      const theta = Math.acos(dot);
+      const sinTheta = Math.sin(theta);
+      const w1 = Math.sin((1 - a) * theta) / sinTheta;
+      const w2 = Math.sin(a * theta) / sinTheta;
+      qx = p.rx * w1 + crx * w2;
+      qy = p.ry * w1 + cry * w2;
+      qz = p.rz * w1 + crz * w2;
+      qw = p.rw * w1 + crw * w2;
+    }
+    // Normalize
     const qlen = Math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw) || 1;
     qx /= qlen; qy /= qlen; qz /= qlen; qw /= qlen;
 
@@ -396,6 +425,9 @@ export class Game {
     // Update wheels (steering/spin from latest physics — these don't need interpolation)
     this.vehicleVisuals.update(this.vehiclePhysics);
     this.vehicleEffects?.update(input);
+
+    // Tron light trail — follows interpolated car position
+    this.tronTrail?.update(lx, ly, lz, qx, qy, qz, qw, state.speed);
 
     // Moving clouds
     this.trackEnvironment?.update(this.elapsed);
@@ -598,6 +630,7 @@ export class Game {
   dispose(): void {
     this.gameLoop?.stop();
     this.inputManager?.dispose();
+    this.tronTrail?.dispose();
     this.skidMarkRenderer?.dispose();
     this.sparkEmitter?.dispose();
     this.tireSmokeEmitter?.dispose();

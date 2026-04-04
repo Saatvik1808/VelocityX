@@ -1,11 +1,11 @@
 /**
- * LEARNING NOTE: Skid Mark Renderer (Babylon.js)
+ * LEARNING NOTE: Neon Skid Mark Renderer (Babylon.js)
  *
- * Skid marks are ribbon meshes that follow the wheel path. Each strip
- * is a dynamic Mesh with updatable vertex positions. Old marks fade
- * via vertex alpha and get recycled.
+ * Skid marks glow with neon cyan color on the dark road surface.
+ * Uses emissive material so marks are self-lit and visible in
+ * the dark environment. Fades over time.
  *
- * Key concepts: dynamic mesh, vertex updates, ribbon geometry
+ * Key concepts: neon emissive trails, dynamic mesh, vertex updates
  */
 
 import {
@@ -21,7 +21,7 @@ import type { Scene } from '@babylonjs/core';
 
 const MAX_STRIPS = 15;
 const MAX_POINTS = 40;
-const FADE_DURATION = 2.5;
+const FADE_DURATION = 3.0;
 const MIN_DISTANCE = 0.5;
 
 interface SkidStrip {
@@ -44,12 +44,6 @@ export class SkidMarkRenderer {
   constructor(scene: Scene) {
     this.root = new TransformNode('skidMarks', scene);
 
-    const mat = new StandardMaterial('skidMat', scene);
-    mat.diffuseColor = new Color3(0.03, 0.03, 0.03);
-    mat.specularColor = Color3.Black();
-    mat.alpha = 0.7;
-    mat.backFaceCulling = false;
-
     for (let i = 0; i < MAX_STRIPS; i++) {
       const maxVerts = MAX_POINTS * 2;
       const positions = new Float32Array(maxVerts * 3);
@@ -66,10 +60,18 @@ export class SkidMarkRenderer {
       vd.positions = positions;
       vd.colors = colors;
       vd.indices = indices;
-      vd.applyToMesh(mesh, true); // updatable = true
+      vd.applyToMesh(mesh, true);
 
-      mesh.material = mat.clone(`skidMat${i}`);
-      // Use material alpha for fading
+      // Neon cyan skid marks — emissive glow
+      const mat = new StandardMaterial(`skidMat${i}`, scene);
+      mat.diffuseColor = new Color3(0, 0.8, 0.8);
+      mat.emissiveColor = new Color3(0, 1, 1);  // cyan glow
+      mat.specularColor = Color3.Black();
+      mat.alpha = 0.9;
+      mat.backFaceCulling = false;
+      mat.disableLighting = true;
+
+      mesh.material = mat;
       mesh.setEnabled(false);
       mesh.parent = this.root;
 
@@ -117,8 +119,12 @@ export class SkidMarkRenderer {
       if (strip.age >= FADE_DURATION) {
         this.resetStrip(strip);
       } else {
-        const alpha = (1.0 - strip.age / FADE_DURATION) * 0.7;
-        (strip.mesh.material as StandardMaterial).alpha = alpha;
+        const alpha = (1.0 - strip.age / FADE_DURATION) * 0.8;
+        const mat = strip.mesh.material as StandardMaterial;
+        mat.alpha = alpha;
+        // Fade emissive too
+        const glow = 1.0 - strip.age / FADE_DURATION;
+        mat.emissiveColor = new Color3(0, glow, glow);
       }
     }
   }
@@ -153,9 +159,10 @@ export class SkidMarkRenderer {
     strip.lastX = lx;
     strip.lastZ = lz;
 
-    // Update mesh vertex buffer
     strip.mesh.updateVerticesData(VertexBuffer.PositionKind, strip.positions, true);
-    (strip.mesh.material as StandardMaterial).alpha = 0.7;
+    const mat = strip.mesh.material as StandardMaterial;
+    mat.alpha = 0.8;
+    mat.emissiveColor = new Color3(0, 1, 1);
   }
 
   private resetStrip(strip: SkidStrip): void {

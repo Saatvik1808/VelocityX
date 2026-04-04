@@ -140,7 +140,7 @@ export function Lobby({ network, onGameStart }: LobbyProps) {
           {!isReady ? (
             <button onClick={() => { network.setReady(); setIsReady(true); }} style={{
               flex: 2, padding: '12px', borderRadius: 10, border: 'none',
-              background: 'linear-gradient(135deg, #22cc55, #18aa44)',
+              background: 'linear-gradient(135deg, #0088ff, #00ccff)',
               color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 15,
               boxShadow: '0 4px 20px rgba(34,204,85,0.3)',
               transition: 'all 0.2s',
@@ -177,9 +177,10 @@ export function Lobby({ network, onGameStart }: LobbyProps) {
       <div style={{ textAlign: 'center', marginBottom: 24 }}>
         <div style={{
           fontSize: 36, fontWeight: 900, letterSpacing: 4,
-          background: 'linear-gradient(135deg, #ff4444, #ff8800, #ffcc00)',
+          background: 'linear-gradient(135deg, #00ffff, #ff00ff, #ffaa00)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
+          textShadow: '0 0 40px rgba(0,255,255,0.3), 0 0 80px rgba(255,0,255,0.2)',
         }}>
           VELOCITYX
         </div>
@@ -220,9 +221,9 @@ export function Lobby({ network, onGameStart }: LobbyProps) {
       {/* Create room */}
       <button onClick={() => network.createRoom(4, 3)} style={{
         width: '100%', padding: '14px', borderRadius: 12, border: 'none',
-        background: 'linear-gradient(135deg, #2266ee, #4488ff)',
+        background: 'linear-gradient(135deg, #0088ff, #00ccff)',
         color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 16,
-        boxShadow: '0 4px 20px rgba(34,102,238,0.3)',
+        boxShadow: '0 4px 20px rgba(0,200,255,0.3), 0 0 40px rgba(0,255,255,0.1)',
         marginBottom: 20, transition: 'all 0.2s',
       }}>
         + CREATE ROOM
@@ -255,7 +256,7 @@ export function Lobby({ network, onGameStart }: LobbyProps) {
             </div>
             <button onClick={() => network.joinRoom(room.id, playerName)} style={{
               padding: '8px 20px', borderRadius: 8, border: 'none',
-              background: 'linear-gradient(135deg, #22cc55, #18aa44)',
+              background: 'linear-gradient(135deg, #0088ff, #00ccff)',
               color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13,
               transition: 'all 0.2s',
             }}>

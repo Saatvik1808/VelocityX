@@ -42,6 +42,8 @@ export class TrackBuilder {
     this.buildSplineTrack();
     this.buildGroundPlane();
     this.buildRoadShoulders();
+    this.buildCurbStrips();
+    this.buildRoadMarkings();
   }
 
   /**
@@ -160,22 +162,12 @@ export class TrackBuilder {
     }, this.scene);
     ground.position.y = -0.15;
 
-    const mat = new PBRMaterial('grassMat', this.scene);
+    const mat = new PBRMaterial('groundMat', this.scene);
 
-    const grassDiffuse = new Texture('/textures/grass_color.jpg', this.scene);
-    grassDiffuse.uScale = 100;
-    grassDiffuse.vScale = 100;
-    grassDiffuse.anisotropicFilteringLevel = 8;
-    mat.albedoTexture = grassDiffuse;
-
-    const grassNormal = new Texture('/textures/grass_normal.jpg', this.scene);
-    grassNormal.uScale = 100;
-    grassNormal.vScale = 100;
-    mat.bumpTexture = grassNormal;
-
-    mat.albedoColor = new Color3(0.9, 0.95, 0.85);
-    mat.metallic = 0.0;
-    mat.roughness = 0.92;
+    // Dark ground — picks up faint neon reflections
+    mat.albedoColor = new Color3(0.03, 0.03, 0.04);
+    mat.metallic = 0.2;
+    mat.roughness = 0.7;
     mat.environmentIntensity = 0.15;
 
     ground.material = mat;
@@ -189,9 +181,9 @@ export class TrackBuilder {
     const sw = 4; // shoulder width
 
     const shoulderMat = new PBRMaterial('shoulderMat', this.scene);
-    shoulderMat.albedoColor = new Color3(0.5, 0.44, 0.38);
-    shoulderMat.metallic = 0.0;
-    shoulderMat.roughness = 0.92;
+    shoulderMat.albedoColor = new Color3(0.03, 0.03, 0.04);  // dark shoulder
+    shoulderMat.metallic = 0.3;
+    shoulderMat.roughness = 0.6;
     shoulderMat.freeze();
 
     for (const side of [-1, 1]) {
@@ -235,9 +227,11 @@ export class TrackBuilder {
     const count = this.centerline.length;
 
     const curbMat = new PBRMaterial('curbMat', this.scene);
-    curbMat.albedoColor = new Color3(0.93, 0.93, 0.93);
-    curbMat.metallic = 0.0;
-    curbMat.roughness = 0.6;
+    curbMat.albedoColor = new Color3(0.05, 0.05, 0.05);
+    curbMat.emissiveColor = new Color3(0, 0.3, 0.3);  // subtle cyan glow
+    curbMat.emissiveIntensity = 0.5;
+    curbMat.metallic = 0.3;
+    curbMat.roughness = 0.4;
     curbMat.freeze();
 
     // Sample every Nth point for curb placement (not every point)
@@ -268,8 +262,9 @@ export class TrackBuilder {
           new Vector3(0, angle, 0).toQuaternion(),
           new Vector3((ax + bx) / 2, 0.06, (az + bz) / 2),
         ));
-        if ((i / step) % 2 === 0) colors.push(0.7, 0.2, 0.15, 1);
-        else colors.push(0.9, 0.9, 0.88, 1);
+        // Alternating neon cyan and magenta curbs
+        if ((i / step) % 2 === 0) colors.push(0, 0.8, 0.8, 1);    // cyan
+        else colors.push(0.8, 0, 0.6, 1);                          // magenta
       }
 
       if (matrices.length > 0) {
@@ -279,6 +274,99 @@ export class TrackBuilder {
         base.thinInstanceSetBuffer('color', new Float32Array(colors), 4);
         base.freezeWorldMatrix();
       }
+    }
+  }
+
+  /** Center dashed line + edge lines for cyberpunk road detail */
+  private buildRoadMarkings(): void {
+    const hw = TRACK.ROAD_WIDTH / 2;
+    const count = this.centerline.length;
+
+    // === Center dashed line — emissive cyan ===
+    const dashMat = new PBRMaterial('dashMat', this.scene);
+    dashMat.albedoColor = new Color3(0.02, 0.02, 0.02);
+    dashMat.emissiveColor = new Color3(0, 0.6, 0.6);
+    dashMat.emissiveIntensity = 0.3;
+    dashMat.metallic = 0.3;
+    dashMat.roughness = 0.4;
+    dashMat.freeze();
+
+    const dashBase = MeshBuilder.CreateBox('dash', { width: 1, height: 0.01, depth: 0.15 }, this.scene);
+    dashBase.material = dashMat;
+    dashBase.isPickable = false;
+    dashBase.parent = this.root;
+
+    const dashStep = Math.max(1, Math.floor(count / 120));
+    const dashMatrices: Matrix[] = [];
+    let dashOn = true;
+
+    for (let i = 0; i < count; i += dashStep) {
+      dashOn = !dashOn;
+      if (!dashOn) continue; // skip every other — dashed pattern
+
+      const a = this.centerline[i]!;
+      const b = this.centerline[(i + dashStep) % count]!;
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const len = Math.sqrt(dx * dx + dz * dz);
+      if (len < 0.01) continue;
+
+      const angle = Math.atan2(dx, dz);
+      dashMatrices.push(Matrix.Compose(
+        new Vector3(len, 1, 1),
+        new Vector3(0, angle, 0).toQuaternion(),
+        new Vector3((a.x + b.x) / 2, 0.015, (a.z + b.z) / 2),
+      ));
+    }
+
+    if (dashMatrices.length > 0) {
+      const buf = new Float32Array(dashMatrices.length * 16);
+      dashMatrices.forEach((m, i) => m.copyToArray(buf, i * 16));
+      dashBase.thinInstanceSetBuffer('matrix', buf, 16);
+      dashBase.freezeWorldMatrix();
+    }
+
+    // === Edge lines — continuous strips along road edges ===
+    const edgeColors: [Color3, Color3] = [
+      new Color3(0, 0.8, 0.8),  // left: cyan
+      new Color3(0.8, 0, 0.6),  // right: magenta
+    ];
+
+    for (let si = 0; si < 2; si++) {
+      const side = si === 0 ? -1 : 1;
+      const edgeMat = new PBRMaterial(`edgeMat${si}`, this.scene);
+      edgeMat.albedoColor = new Color3(0.02, 0.02, 0.02);
+      edgeMat.emissiveColor = edgeColors[si]!;
+      edgeMat.emissiveIntensity = 0.4;
+      edgeMat.metallic = 0.3;
+      edgeMat.roughness = 0.4;
+      edgeMat.freeze();
+
+      const offset = hw - 0.5;
+      const edgePath = this.splinePath.map((pt, i) => {
+        const next = this.splinePath[(i + 1) % this.splinePath.length]!;
+        const dx = next.x - pt.x;
+        const dz = next.z - pt.z;
+        const len = Math.sqrt(dx * dx + dz * dz) || 1;
+        const nx = -dz / len;
+        const nz = dx / len;
+        return new Vector3(pt.x + nx * offset * side, 0.015, pt.z + nz * offset * side);
+      });
+
+      const edgeShape = [
+        new Vector3(-0.05, 0, 0),
+        new Vector3(0.05, 0, 0),
+      ];
+
+      const edge = MeshBuilder.ExtrudeShape(`edgeLine${si}`, {
+        shape: edgeShape,
+        path: edgePath,
+        sideOrientation: Mesh.DOUBLESIDE,
+        updatable: false,
+      }, this.scene);
+      edge.material = edgeMat;
+      edge.isPickable = false;
+      edge.freezeWorldMatrix();
+      edge.parent = this.root;
     }
   }
 

@@ -1,17 +1,18 @@
 /**
- * LEARNING NOTE: Premium Hand-Crafted Car (Babylon.js)
+ * LEARNING NOTE: Neon Cyberpunk Car (Babylon.js)
  *
- * Smooth sports car using rounded shapes — sphere-based body for curves,
- * proper torus wheels with chrome rims, all with shiny PBR materials.
- * No GLB dependency = instant load, guaranteed physics alignment.
+ * Dark metallic body with neon underglow, cyan headlights, and
+ * glowing accent strips. The car should look like it belongs in
+ * a cyberpunk night race — chrome and neon on black.
  *
- * Key concepts: MeshBuilder shapes, PBR materials, wheel hierarchy
+ * Key concepts: emissive neon accents, dark PBR, underglow lighting
  */
 
 import {
   MeshBuilder,
   Mesh,
   PBRMaterial,
+  PointLight,
   TransformNode,
   Color3,
   Vector3,
@@ -40,47 +41,54 @@ export class VehicleVisuals {
     this.root = new TransformNode('vehicle', scene);
     this.bodyNode = new TransformNode('bodyNode', scene);
     this.bodyNode.parent = this.root;
-    // Align body with wheels
     this.bodyNode.position.y = 0;
     this.buildCar();
     this.buildWheels();
+    this.buildUnderglow();
   }
 
   private buildCar(): void {
     const W = 1.9, H = 0.7, L = 4.2;
     const hw = W / 2, hl = L / 2;
 
-    // === MATERIALS ===
+    // === MATERIALS — Dark & Neon ===
     const bodyMat = new PBRMaterial('carBody', this.scene);
-    bodyMat.albedoColor = new Color3(0.8, 0.1, 0.05);
-    bodyMat.metallic = 0.55;
-    bodyMat.roughness = 0.15;
+    bodyMat.albedoColor = new Color3(0.03, 0.03, 0.05);  // near-black
+    bodyMat.metallic = 0.85;
+    bodyMat.roughness = 0.1;   // very reflective — mirrors neon
     bodyMat.clearCoat.isEnabled = true;
     bodyMat.clearCoat.intensity = 1.0;
-    bodyMat.clearCoat.roughness = 0.04;
-    bodyMat.environmentIntensity = 1.2;
+    bodyMat.clearCoat.roughness = 0.02;
+    bodyMat.environmentIntensity = 2.0;
 
     const glassMat = new PBRMaterial('glass', this.scene);
-    glassMat.albedoColor = new Color3(0.08, 0.12, 0.18);
-    glassMat.metallic = 0.1;
+    glassMat.albedoColor = new Color3(0.02, 0.05, 0.08);
+    glassMat.metallic = 0.3;
     glassMat.roughness = 0.02;
-    glassMat.alpha = 0.3;
+    glassMat.alpha = 0.25;
 
     const darkMat = new PBRMaterial('dark', this.scene);
-    darkMat.albedoColor = new Color3(0.03, 0.03, 0.03);
-    darkMat.metallic = 0.2;
-    darkMat.roughness = 0.85;
+    darkMat.albedoColor = new Color3(0.02, 0.02, 0.02);
+    darkMat.metallic = 0.3;
+    darkMat.roughness = 0.7;
 
     const chromeMat = new PBRMaterial('chrome', this.scene);
-    chromeMat.albedoColor = new Color3(0.85, 0.85, 0.85);
+    chromeMat.albedoColor = new Color3(0.7, 0.7, 0.75);
     chromeMat.metallic = 1.0;
-    chromeMat.roughness = 0.05;
-    chromeMat.environmentIntensity = 2.0;
+    chromeMat.roughness = 0.03;
+    chromeMat.environmentIntensity = 3.0;
 
+    // Neon cyan headlight material
     const hlMat = new PBRMaterial('hl', this.scene);
-    hlMat.albedoColor = Color3.White();
-    hlMat.emissiveColor = new Color3(1, 1, 0.9);
-    hlMat.emissiveIntensity = 1.5;
+    hlMat.albedoColor = new Color3(0, 0.5, 0.5);
+    hlMat.emissiveColor = new Color3(0, 1, 1);  // cyan glow
+    hlMat.emissiveIntensity = 3.0;
+
+    // Neon accent strip material
+    const accentMat = new PBRMaterial('accent', this.scene);
+    accentMat.albedoColor = new Color3(0, 0.3, 0.3);
+    accentMat.emissiveColor = new Color3(0, 1, 1);  // cyan
+    accentMat.emissiveIntensity = 2.0;
 
     // === BODY — main lower body ===
     const body = MeshBuilder.CreateBox('body', { width: W, height: H * 0.55, depth: L }, this.scene);
@@ -88,7 +96,7 @@ export class VehicleVisuals {
     body.position.y = H * 0.28;
     body.parent = this.bodyNode;
 
-    // Hood — front top
+    // Hood
     const hood = MeshBuilder.CreateBox('hood', { width: W * 0.94, height: H * 0.12, depth: L * 0.3 }, this.scene);
     hood.material = bodyMat;
     hood.position.set(0, H * 0.52, L * 0.23);
@@ -124,21 +132,27 @@ export class VehicleVisuals {
     rb.position.set(0, H * 0.1, -hl - 0.03);
     rb.parent = this.bodyNode;
 
-    // Grille
+    // Grille — chrome
     const grille = MeshBuilder.CreateBox('grille', { width: W * 0.55, height: H * 0.1, depth: 0.03 }, this.scene);
     grille.material = chromeMat;
     grille.position.set(0, H * 0.16, hl + 0.1);
     grille.parent = this.bodyNode;
 
-    // Side skirts
+    // Side skirts with neon accent strip
     for (const s of [-1, 1]) {
       const skirt = MeshBuilder.CreateBox('skirt', { width: 0.04, height: H * 0.12, depth: L * 0.5 }, this.scene);
       skirt.material = darkMat;
       skirt.position.set(hw * s, H * 0.06, 0);
       skirt.parent = this.bodyNode;
+
+      // Neon accent strip along the side
+      const strip = MeshBuilder.CreateBox('sideNeon', { width: 0.02, height: 0.03, depth: L * 0.6 }, this.scene);
+      strip.material = accentMat;
+      strip.position.set(hw * s * 1.01, H * 0.12, 0);
+      strip.parent = this.bodyNode;
     }
 
-    // Fenders (rounded wheel arches)
+    // Fenders
     for (const s of [-1, 1]) {
       for (const fz of [0.28, -0.28]) {
         const fender = MeshBuilder.CreateBox('fender', { width: W * 0.12, height: H * 0.3, depth: L * 0.16 }, this.scene);
@@ -160,7 +174,7 @@ export class VehicleVisuals {
     wing.position.set(0, H * 0.74, -hl + 0.12);
     wing.parent = this.bodyNode;
 
-    // Headlights
+    // Headlights — neon cyan
     for (const s of [-1, 1]) {
       const h = MeshBuilder.CreateSphere('hl', { diameter: 0.18, segments: 8 }, this.scene);
       h.material = hlMat;
@@ -168,12 +182,12 @@ export class VehicleVisuals {
       h.parent = this.bodyNode;
     }
 
-    // Tail lights
+    // Tail lights — neon magenta
     for (const s of [-1, 1]) {
       const tlMat = new PBRMaterial('tl', this.scene);
-      tlMat.albedoColor = new Color3(1, 0, 0);
-      tlMat.emissiveColor = new Color3(0.9, 0, 0);
-      tlMat.emissiveIntensity = 0.8;
+      tlMat.albedoColor = new Color3(0.5, 0, 0.3);
+      tlMat.emissiveColor = new Color3(1, 0, 0.6);  // magenta-red
+      tlMat.emissiveIntensity = 1.2;
       const tl = MeshBuilder.CreateBox('tl', { width: 0.25, height: 0.06, depth: 0.04 }, this.scene);
       tl.material = tlMat;
       tl.position.set(hw * 0.6 * s, H * 0.38, -hl - 0.02);
@@ -181,17 +195,17 @@ export class VehicleVisuals {
       this.tailLightMats.push(tlMat);
     }
 
-    // Rear light bar
+    // Rear light bar — neon
     const bar = MeshBuilder.CreateBox('bar', { width: W * 0.4, height: 0.02, depth: 0.03 }, this.scene);
     const barMat = new PBRMaterial('barM', this.scene);
-    barMat.albedoColor = new Color3(0.8, 0, 0);
-    barMat.emissiveColor = new Color3(0.5, 0, 0);
-    barMat.emissiveIntensity = 0.4;
+    barMat.albedoColor = new Color3(0.3, 0, 0.15);
+    barMat.emissiveColor = new Color3(1, 0, 0.5);
+    barMat.emissiveIntensity = 0.8;
     bar.material = barMat;
     bar.position.set(0, H * 0.38, -hl - 0.01);
     bar.parent = this.bodyNode;
 
-    // Exhaust tips
+    // Exhaust tips — chrome
     for (const s of [-0.3, 0.3]) {
       const ex = MeshBuilder.CreateCylinder('ex', { diameter: 0.08, height: 0.12, tessellation: 8 }, this.scene);
       ex.material = chromeMat;
@@ -201,42 +215,63 @@ export class VehicleVisuals {
     }
   }
 
+  /** Neon underglow — colored light under the car */
+  private buildUnderglow(): void {
+    // Cyan underglow light
+    const underglow = new PointLight('underglow', new Vector3(0, -0.1, 0), this.scene);
+    underglow.diffuse = new Color3(0, 1, 1);  // cyan
+    underglow.intensity = 4.5;
+    underglow.range = 10;
+    underglow.parent = this.root;
+
+    // Rear underglow — magenta
+    const rearGlow = new PointLight('rearGlow', new Vector3(0, -0.1, -1.5), this.scene);
+    rearGlow.diffuse = new Color3(1, 0, 1);  // magenta
+    rearGlow.intensity = 3.5;
+    rearGlow.range = 7;
+    rearGlow.parent = this.root;
+  }
+
   private buildWheels(): void {
     // Tire material — dark rubber
     const tireMat = new PBRMaterial('tire', this.scene);
-    tireMat.albedoColor = new Color3(0.06, 0.06, 0.06);
+    tireMat.albedoColor = new Color3(0.04, 0.04, 0.04);
     tireMat.metallic = 0.02;
     tireMat.roughness = 0.95;
 
-    // Rim material — shiny alloy
+    // Rim material — dark chrome with neon tint
     const rimMat = new PBRMaterial('rim', this.scene);
-    rimMat.albedoColor = new Color3(0.75, 0.75, 0.78);
+    rimMat.albedoColor = new Color3(0.3, 0.3, 0.35);
     rimMat.metallic = 0.95;
-    rimMat.roughness = 0.08;
-    rimMat.environmentIntensity = 1.8;
+    rimMat.roughness = 0.05;
+    rimMat.environmentIntensity = 2.0;
 
     // Hub material
     const hubMat = new PBRMaterial('hub', this.scene);
-    hubMat.albedoColor = new Color3(0.3, 0.3, 0.32);
+    hubMat.albedoColor = new Color3(0.15, 0.15, 0.18);
     hubMat.metallic = 0.8;
     hubMat.roughness = 0.2;
+
+    // Neon wheel ring material
+    const wheelNeonMat = new PBRMaterial('wheelNeon', this.scene);
+    wheelNeonMat.albedoColor = new Color3(0, 0.3, 0.3);
+    wheelNeonMat.emissiveColor = new Color3(0, 1, 1);  // cyan glow
+    wheelNeonMat.emissiveIntensity = 1.0;
 
     for (let wi = 0; wi < WHEEL_POSITIONS.length; wi++) {
       const wp = WHEEL_POSITIONS[wi]!;
 
-      // Container = steering
       const container = new TransformNode(`wc${wi}`, this.scene);
       container.position.set(wp.x, wp.y, wp.z);
       container.parent = this.root;
 
-      // Spinner = wheel spin
       const spinner = new TransformNode(`ws${wi}`, this.scene);
       spinner.parent = container;
 
       const r = WHEELS.RADIUS;
       const w = WHEELS.WIDTH;
 
-      // Tire — cylinder, compact, no clipping
+      // Tire
       const tire = MeshBuilder.CreateCylinder(`tire${wi}`, {
         diameter: r * 2,
         height: w,
@@ -246,7 +281,7 @@ export class VehicleVisuals {
       tire.rotation.z = Math.PI / 2;
       tire.parent = spinner;
 
-      // Rim disc (slightly smaller diameter, narrower)
+      // Rim disc
       const rim = MeshBuilder.CreateCylinder(`rim${wi}`, {
         diameter: r * 1.5,
         height: w * 0.3,
@@ -255,6 +290,16 @@ export class VehicleVisuals {
       rim.material = rimMat;
       rim.rotation.z = Math.PI / 2;
       rim.parent = spinner;
+
+      // Neon ring around the tire
+      const neonRing = MeshBuilder.CreateTorus(`neonRing${wi}`, {
+        diameter: r * 2.02,
+        thickness: 0.03,
+        tessellation: 16,
+      }, this.scene);
+      neonRing.material = wheelNeonMat;
+      neonRing.rotation.z = Math.PI / 2;
+      neonRing.parent = spinner;
 
       // Spokes
       for (let s = 0; s < 5; s++) {

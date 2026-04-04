@@ -1,11 +1,11 @@
 /**
- * LEARNING NOTE: Heavy Realistic Tire Smoke (Babylon.js)
+ * LEARNING NOTE: Neon-Tinted Tire Smoke (Babylon.js)
  *
- * Aggressive, always-visible smoke that responds to speed and drift.
- * High emission rate, large particles, rapid expansion. Two layers:
- * thick contact smoke + wide lingering haze trail.
+ * Tire smoke picks up the neon colors from the environment — starting
+ * with a cyan/magenta tint and fading to dark grey. The smoke is lit
+ * by the neon underglow creating colored volumetric clouds.
  *
- * Key concepts: high-rate emission, size gradients, color gradients, turbulence
+ * Key concepts: neon-tinted particles, color gradients, smoke dynamics
  */
 
 import {
@@ -24,7 +24,7 @@ export class TireSmokeEmitter {
   constructor(scene: Scene) {
     this.smokeTexture = this.createSmokeTexture(scene);
 
-    // === LAYER 1: Heavy contact smoke — thick, fast, always visible ===
+    // === LAYER 1: Neon-tinted contact smoke ===
     this.thickSmoke = new ParticleSystem('smoke', 1500, scene);
     this.thickSmoke.particleTexture = this.smokeTexture;
     this.thickSmoke.emitter = new Vector3(0, 0, 0);
@@ -33,40 +33,36 @@ export class TireSmokeEmitter {
     this.thickSmoke.minLifeTime = 1.5;
     this.thickSmoke.maxLifeTime = 3.5;
 
-    // Size: small puffs that grow moderately (not blocking view)
     this.thickSmoke.addSizeGradient(0, 0.1, 0.2);
     this.thickSmoke.addSizeGradient(0.2, 0.3, 0.5);
     this.thickSmoke.addSizeGradient(0.5, 0.8, 1.2);
     this.thickSmoke.addSizeGradient(0.8, 1.5, 2.0);
     this.thickSmoke.addSizeGradient(1.0, 2.0, 3.0);
 
-    // Color: bright white → grey → transparent
-    this.thickSmoke.addColorGradient(0, new Color4(1.0, 1.0, 1.0, 0.9));
-    this.thickSmoke.addColorGradient(0.1, new Color4(0.95, 0.95, 0.96, 0.75));
-    this.thickSmoke.addColorGradient(0.3, new Color4(0.8, 0.8, 0.82, 0.5));
-    this.thickSmoke.addColorGradient(0.6, new Color4(0.55, 0.55, 0.58, 0.25));
-    this.thickSmoke.addColorGradient(1.0, new Color4(0.4, 0.4, 0.42, 0));
+    // Neon-tinted smoke: cyan → white → dark transparent
+    this.thickSmoke.addColorGradient(0, new Color4(0.2, 0.9, 1.0, 0.95));   // vivid cyan tint
+    this.thickSmoke.addColorGradient(0.1, new Color4(0.4, 0.8, 0.9, 0.7));
+    this.thickSmoke.addColorGradient(0.3, new Color4(0.3, 0.4, 0.5, 0.45));
+    this.thickSmoke.addColorGradient(0.6, new Color4(0.15, 0.15, 0.2, 0.2));
+    this.thickSmoke.addColorGradient(1.0, new Color4(0.05, 0.05, 0.08, 0));
 
-    // Direction: strong upward + outward spread
     this.thickSmoke.direction1 = new Vector3(-2, 1, -2);
     this.thickSmoke.direction2 = new Vector3(2, 5, 2);
     this.thickSmoke.minEmitPower = 1.5;
     this.thickSmoke.maxEmitPower = 4.0;
 
-    // Gravity: upward buoyancy (hot smoke rises)
     this.thickSmoke.gravity = new Vector3(0.4, 1.2, 0.2);
-
-    // Rotation for organic look
     this.thickSmoke.minAngularSpeed = -1.0;
     this.thickSmoke.maxAngularSpeed = 1.0;
 
-    this.thickSmoke.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    // Use additive blend for neon glow effect
+    this.thickSmoke.blendMode = ParticleSystem.BLENDMODE_ADD;
     this.thickSmoke.minEmitBox = new Vector3(-0.4, 0, -0.4);
     this.thickSmoke.maxEmitBox = new Vector3(0.4, 0.15, 0.4);
 
     this.thickSmoke.start();
 
-    // === LAYER 2: Wide haze trail — lingers behind the car ===
+    // === LAYER 2: Neon haze trail ===
     this.hazeTrail = new ParticleSystem('haze', 500, scene);
     this.hazeTrail.particleTexture = this.smokeTexture;
     this.hazeTrail.emitter = new Vector3(0, 0, 0);
@@ -80,10 +76,11 @@ export class TireSmokeEmitter {
     this.hazeTrail.addSizeGradient(0.6, 2.0, 3.0);
     this.hazeTrail.addSizeGradient(1.0, 3.0, 4.0);
 
-    this.hazeTrail.addColorGradient(0, new Color4(0.8, 0.8, 0.82, 0.35));
-    this.hazeTrail.addColorGradient(0.3, new Color4(0.6, 0.6, 0.62, 0.2));
-    this.hazeTrail.addColorGradient(0.7, new Color4(0.45, 0.45, 0.47, 0.08));
-    this.hazeTrail.addColorGradient(1.0, new Color4(0.35, 0.35, 0.37, 0));
+    // Magenta-tinted haze
+    this.hazeTrail.addColorGradient(0, new Color4(0.6, 0.1, 0.5, 0.3));
+    this.hazeTrail.addColorGradient(0.3, new Color4(0.3, 0.05, 0.3, 0.15));
+    this.hazeTrail.addColorGradient(0.7, new Color4(0.1, 0.02, 0.12, 0.06));
+    this.hazeTrail.addColorGradient(1.0, new Color4(0.03, 0.01, 0.04, 0));
 
     this.hazeTrail.direction1 = new Vector3(-3, 0.2, -3);
     this.hazeTrail.direction2 = new Vector3(3, 1.5, 3);
@@ -92,7 +89,7 @@ export class TireSmokeEmitter {
     this.hazeTrail.gravity = new Vector3(0.6, 0.15, 0.3);
     this.hazeTrail.minAngularSpeed = -0.4;
     this.hazeTrail.maxAngularSpeed = 0.4;
-    this.hazeTrail.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    this.hazeTrail.blendMode = ParticleSystem.BLENDMODE_ADD;
     this.hazeTrail.minEmitBox = new Vector3(-0.8, 0, -0.8);
     this.hazeTrail.maxEmitBox = new Vector3(0.8, 0.1, 0.8);
 
@@ -109,7 +106,6 @@ export class TireSmokeEmitter {
 
     const cx = size / 2, cy = size / 2;
 
-    // Soft cloud-like shape with multiple overlapping gradients
     const g1 = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.45);
     g1.addColorStop(0, 'rgba(255,255,255,1)');
     g1.addColorStop(0.25, 'rgba(255,255,255,0.85)');
@@ -118,7 +114,6 @@ export class TireSmokeEmitter {
     ctx.fillStyle = g1;
     ctx.fillRect(0, 0, size, size);
 
-    // Off-center blobs for organic cloud look
     for (const [ox, oy, r] of [[-10, -8, 0.3], [12, 6, 0.25], [-5, 12, 0.2]] as const) {
       const g = ctx.createRadialGradient(cx + ox, cy + oy, 0, cx + ox, cy + oy, size * r);
       g.addColorStop(0, 'rgba(255,255,255,0.4)');
