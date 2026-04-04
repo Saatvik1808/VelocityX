@@ -95,9 +95,9 @@ export function HUD() {
         </div>
       )}
 
-      {/* FPS */}
+      {/* FPS — pushed below the toolbar buttons */}
       <div style={{
-        position: 'absolute', top: 8, right: 12,
+        position: 'absolute', top: 58, right: 14,
         fontSize: 11, opacity: 0.25, fontFamily: 'monospace', color: '#fff',
       }}>
         {fps} FPS
@@ -113,9 +113,9 @@ export function HUD() {
         </svg>
       </div>
 
-      {/* Position + Lap — top right */}
+      {/* Position + Lap — top right, below toolbar buttons */}
       <div style={{
-        ...panel, position: 'absolute', top: 14, right: 14,
+        ...panel, position: 'absolute', top: 72, right: 14,
         textAlign: 'right', minWidth: 100,
       }}>
         <div style={{ fontSize: 34, fontWeight: 800, lineHeight: 1 }}>
@@ -260,6 +260,7 @@ export function HUD() {
       }}>
         <div><b>W/S</b> gas/brake &nbsp; <b>A/D</b> steer</div>
         <div><b>SPACE</b> drift &nbsp; <b>SHIFT</b> nitro</div>
+        <div><b>~</b> respawn to track</div>
       </div>
 
       {/* Leave room button */}
@@ -270,7 +271,7 @@ export function HUD() {
           window.location.reload();
         }}
         style={{
-          position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)',
+          position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
           padding: '6px 16px', borderRadius: 8, border: 'none',
           background: 'rgba(200, 50, 50, 0.4)', color: '#ff8888',
           cursor: 'pointer', fontSize: 11, pointerEvents: 'auto',

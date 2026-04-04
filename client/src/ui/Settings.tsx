@@ -146,6 +146,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
               ['D / Right', 'Steer Right'],
               ['Space', 'Drift'],
               ['Shift', 'Nitro'],
+              ['~ (tilde)', 'Respawn to Track'],
             ].map(([key, action]) => (
               <div key={key} style={{ display: 'contents' }}>
                 <div style={{

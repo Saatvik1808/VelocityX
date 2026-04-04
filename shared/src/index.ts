@@ -35,6 +35,7 @@ export type {
   RaceResult,
   ClientToServerEvents,
   ServerToClientEvents,
+  LeaderboardEntry,
 } from './protocol.js';
 
 export type { VehicleDef } from './vehicles.js';

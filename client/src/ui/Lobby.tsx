@@ -173,15 +173,15 @@ export function Lobby({ network, onGameStart }: LobbyProps) {
       backdropFilter: 'blur(16px)',
       borderRadius: 16,
       border: '1px solid rgba(255,255,255,0.08)',
-      padding: '32px 36px',
-      width: 440,
+      padding: '24px 28px',
+      width: 420,
       color: '#fff',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
     }}>
       {/* Title */}
-      <div style={{ textAlign: 'center', marginBottom: 24 }}>
+      <div style={{ textAlign: 'center', marginBottom: 16 }}>
         <div style={{
-          fontSize: 36, fontWeight: 900, letterSpacing: 4,
+          fontSize: 32, fontWeight: 900, letterSpacing: 4,
           background: 'linear-gradient(135deg, #00ffff, #ff00ff, #ffaa00)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
@@ -189,12 +189,12 @@ export function Lobby({ network, onGameStart }: LobbyProps) {
         }}>
           VELOCITYX
         </div>
-        <div style={{ fontSize: 12, opacity: 0.4, marginTop: 4, letterSpacing: 3 }}>
+        <div style={{ fontSize: 10, opacity: 0.4, marginTop: 2, letterSpacing: 3 }}>
           MULTIPLAYER RACING
         </div>
         <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          marginTop: 8, fontSize: 12,
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          marginTop: 6, fontSize: 11,
           color: network.connected ? '#44dd66' : '#ff4444',
         }}>
           <div style={{
@@ -206,58 +206,62 @@ export function Lobby({ network, onGameStart }: LobbyProps) {
       </div>
 
       {/* Player name */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, opacity: 0.4, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 10, opacity: 0.4, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>
           Your Name
         </div>
         <input
           type="text" value={playerName}
           onChange={e => setPlayerName(e.target.value)}
           style={{
-            width: '100%', padding: '10px 14px', borderRadius: 10,
+            width: '100%', padding: '8px 12px', borderRadius: 8,
             border: '1px solid rgba(255,255,255,0.1)',
             background: 'rgba(255,255,255,0.04)', color: '#fff',
-            fontSize: 15, fontWeight: 600, boxSizing: 'border-box',
+            fontSize: 14, fontWeight: 600, boxSizing: 'border-box',
             outline: 'none',
           }}
         />
       </div>
 
       {/* Vehicle selector */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, opacity: 0.4, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 10, opacity: 0.4, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>
           Select Vehicle
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           {VEHICLE_IDS.map((vid) => {
             const v = VEHICLES[vid]!;
             const isSelected = selectedVehicleId === vid;
-            const accentCss = `rgb(${Math.round(v.accentColor[0] * 255)}, ${Math.round(v.accentColor[1] * 255)}, ${Math.round(v.accentColor[2] * 255)})`;
+            const ar = Math.round(v.accentColor[0] * 255);
+            const ag = Math.round(v.accentColor[1] * 255);
+            const ab = Math.round(v.accentColor[2] * 255);
+            const accentSolid = `rgb(${ar}, ${ag}, ${ab})`;
             return (
               <button
                 key={vid}
                 onClick={() => setSelectedVehicleId(vid)}
                 style={{
-                  padding: '10px 12px', borderRadius: 10, border: 'none',
+                  padding: '8px 10px', borderRadius: 8, border: 'none',
+                  color: '#ccc',
                   background: isSelected
-                    ? `linear-gradient(135deg, ${accentCss}22, ${accentCss}11)`
+                    ? `linear-gradient(135deg, rgba(${ar},${ag},${ab},0.13), rgba(${ar},${ag},${ab},0.06))`
                     : 'rgba(255,255,255,0.04)',
-                  outline: isSelected ? `2px solid ${accentCss}` : '2px solid transparent',
-                  cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s',
-                  boxShadow: isSelected ? `0 0 20px ${accentCss}33` : 'none',
+                  outline: isSelected ? `2px solid ${accentSolid}` : '2px solid transparent',
+                  cursor: 'pointer', textAlign: 'left' as const, transition: 'all 0.2s',
+                  boxShadow: isSelected ? `0 0 20px rgba(${ar},${ag},${ab},0.2)` : 'none',
                 }}
               >
                 <div style={{
-                  fontSize: 14, fontWeight: 800, letterSpacing: 2, color: isSelected ? accentCss : '#ccc',
-                  marginBottom: 2,
+                  fontSize: 12, fontWeight: 800, letterSpacing: 2, color: isSelected ? accentSolid : '#ccc',
+                  marginBottom: 1,
                 }}>
                   {v.name}
                 </div>
-                <div style={{ fontSize: 10, opacity: 0.5, color: '#aaa', lineHeight: 1.3 }}>
+                <div style={{ fontSize: 9, opacity: 0.45, color: '#aaa', lineHeight: 1.2 }}>
                   {v.description}
                 </div>
                 <div style={{
-                  display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap',
+                  display: 'flex', gap: 3, marginTop: 4, flexWrap: 'wrap',
                 }}>
                   {[
                     { label: 'SPD', val: v.topSpeedMult },
@@ -266,8 +270,8 @@ export function Lobby({ network, onGameStart }: LobbyProps) {
                     { label: 'DFT', val: v.driftMult },
                   ].map(({ label, val }) => (
                     <div key={label} style={{
-                      fontSize: 9, padding: '2px 5px', borderRadius: 4,
-                      background: `${accentCss}18`, color: accentCss,
+                      fontSize: 8, padding: '1px 4px', borderRadius: 3,
+                      background: `rgba(${ar},${ag},${ab},0.1)`, color: accentSolid,
                       fontWeight: 700,
                     }}>
                       {label} {val.toFixed(1)}x
@@ -282,23 +286,23 @@ export function Lobby({ network, onGameStart }: LobbyProps) {
 
       {/* Create room */}
       <button onClick={() => network.createRoom(4, 3)} style={{
-        width: '100%', padding: '14px', borderRadius: 12, border: 'none',
+        width: '100%', padding: '11px', borderRadius: 10, border: 'none',
         background: 'linear-gradient(135deg, #0088ff, #00ccff)',
-        color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 16,
-        boxShadow: '0 4px 20px rgba(0,200,255,0.3), 0 0 40px rgba(0,255,255,0.1)',
-        marginBottom: 20, transition: 'all 0.2s',
+        color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14,
+        boxShadow: '0 4px 15px rgba(0,200,255,0.25), 0 0 30px rgba(0,255,255,0.08)',
+        marginBottom: 14, transition: 'all 0.2s',
       }}>
         + CREATE ROOM
       </button>
 
       {/* Room list */}
-      <div style={{ fontSize: 11, opacity: 0.4, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
+      <div style={{ fontSize: 10, opacity: 0.4, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
         Available Rooms
       </div>
       {rooms.length === 0 ? (
         <div style={{
-          textAlign: 'center', padding: '24px', borderRadius: 10,
-          background: 'rgba(255,255,255,0.02)', opacity: 0.3, fontSize: 14,
+          textAlign: 'center', padding: '16px', borderRadius: 8,
+          background: 'rgba(255,255,255,0.02)', opacity: 0.3, fontSize: 13,
         }}>
           No rooms yet — create one!
         </div>

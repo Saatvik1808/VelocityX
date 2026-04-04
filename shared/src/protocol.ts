@@ -73,7 +73,8 @@ export interface ClientToServerEvents {
   CLIENT_LIST_ROOMS: () => void;
   CLIENT_LEAVE_ROOM: () => void;
   CLIENT_CHECKPOINT_HIT: (data: { checkpointIndex: number; lapNumber: number }) => void;
-  CLIENT_FINISHED: (data: { time: number }) => void;
+  CLIENT_FINISHED: (data: { time: number; vehicleId: string }) => void;
+  CLIENT_GET_LEADERBOARD: (data: { limit?: number }) => void;
 }
 
 // === Server → Client Events ===
@@ -88,5 +89,16 @@ export interface ServerToClientEvents {
   SERVER_ROOM_LIST: (data: { rooms: RoomSummary[] }) => void;
   SERVER_ASSIGN_ID: (data: { playerId: PlayerId }) => void;
   SERVER_POSITION_UPDATE: (data: { positions: Array<{ playerId: PlayerId; position: number; lap: number }> }) => void;
+  SERVER_LEADERBOARD: (data: { entries: LeaderboardEntry[] }) => void;
   SERVER_ERROR: (data: { message: string }) => void;
+}
+
+/** Leaderboard entry from the server database */
+export interface LeaderboardEntry {
+  id: number;
+  name: string;
+  vehicleId: string;
+  laps: number;
+  time: number;
+  date: string;
 }

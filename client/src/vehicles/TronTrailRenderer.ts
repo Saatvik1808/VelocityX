@@ -45,8 +45,17 @@ export class TronTrailRenderer {
   private colors: Float32Array;
   private lastX = NaN;
   private lastZ = NaN;
+  /** Trail RGB color (default cyan) */
+  private trailR = 0;
+  private trailG = 1;
+  private trailB = 1;
 
-  constructor(scene: Scene) {
+  constructor(scene: Scene, color?: [number, number, number]) {
+    if (color) {
+      this.trailR = color[0];
+      this.trailG = color[1];
+      this.trailB = color[2];
+    }
     const maxVerts = MAX_POINTS * 2; // bottom + top per point
 
     this.positions = new Float32Array(maxVerts * 3);
@@ -70,10 +79,10 @@ export class TronTrailRenderer {
     vd.indices = indices;
     vd.applyToMesh(this.mesh, true);
 
-    // Neon emissive material — self-lit cyan glow
+    // Neon emissive material — self-lit glow in trail color
     const mat = new StandardMaterial('tronTrailMat', scene);
-    mat.diffuseColor = new Color3(0, 0.8, 0.8);
-    mat.emissiveColor = new Color3(0, 1, 1);
+    mat.diffuseColor = new Color3(this.trailR * 0.8, this.trailG * 0.8, this.trailB * 0.8);
+    mat.emissiveColor = new Color3(this.trailR, this.trailG, this.trailB);
     mat.specularColor = Color3.Black();
     mat.alpha = 1.0;
     mat.backFaceCulling = false;
@@ -166,16 +175,16 @@ export class TronTrailRenderer {
       const alpha = ageFactor * 0.85;
       const glow = 0.3 + ageFactor * 0.7; // emissive brightness also fades
 
-      // Bottom vertex color
-      this.colors[vi * 4] = 0;
-      this.colors[vi * 4 + 1] = glow;
-      this.colors[vi * 4 + 2] = glow;
+      // Bottom vertex color — uses trail color
+      this.colors[vi * 4] = this.trailR * glow;
+      this.colors[vi * 4 + 1] = this.trailG * glow;
+      this.colors[vi * 4 + 2] = this.trailB * glow;
       this.colors[vi * 4 + 3] = alpha * 0.6; // bottom edge slightly dimmer
 
       // Top vertex color — brighter at the top edge
-      this.colors[(vi + 1) * 4] = 0;
-      this.colors[(vi + 1) * 4 + 1] = glow;
-      this.colors[(vi + 1) * 4 + 2] = glow;
+      this.colors[(vi + 1) * 4] = this.trailR * glow;
+      this.colors[(vi + 1) * 4 + 1] = this.trailG * glow;
+      this.colors[(vi + 1) * 4 + 2] = this.trailB * glow;
       this.colors[(vi + 1) * 4 + 3] = alpha;
     }
 

@@ -25,6 +25,7 @@ import { NETWORK } from '@neon-drift/shared';
 import { RoomManager } from './RoomManager.js';
 import { PlayerState } from './PlayerState.js';
 import { RaceStateMachine } from './RaceStateMachine.js';
+import { Persistence } from './Persistence.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -38,6 +39,7 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
 
 const roomManager = new RoomManager();
 const raceStateMachine = new RaceStateMachine(io);
+const persistence = new Persistence();
 
 // Serve client build files in production
 import { fileURLToPath } from 'url';
@@ -48,6 +50,13 @@ app.use(express.static(clientDist));
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', players: io.engine.clientsCount }));
+
+// REST API: Leaderboard (accessible without WebSocket)
+app.get('/api/leaderboard', (_req, res) => {
+  const limit = parseInt(String(_req.query.limit)) || 10;
+  const entries = persistence.getTopTimes(Math.min(limit, 50));
+  res.json({ entries, totalRaces: persistence.getRaceCount() });
+});
 
 // Self-ping to prevent Render free tier spin-down (every 4 minutes)
 if (process.env.RENDER_EXTERNAL_URL) {
@@ -158,7 +167,20 @@ io.on('connection', (socket) => {
   socket.on('CLIENT_FINISHED', (data) => {
     const room = roomManager.getPlayerRoom(playerId);
     if (!room) return;
+
+    // Save to leaderboard database
+    const player = room.players.get(playerId);
+    const playerName = player?.name ?? `Player ${playerId.slice(0, 4)}`;
+    const vehicleId = data.vehicleId ?? 'ronin';
+    persistence.saveRaceTime(playerName, vehicleId, room.laps, data.time);
+
     raceStateMachine.playerFinished(room, playerId, data.time);
+  });
+
+  socket.on('CLIENT_GET_LEADERBOARD', (data) => {
+    const limit = data?.limit ?? 10;
+    const entries = persistence.getTopTimes(Math.min(limit, 50));
+    socket.emit('SERVER_LEADERBOARD', { entries });
   });
 
   // === Disconnect ===

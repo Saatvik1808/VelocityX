@@ -43,6 +43,7 @@ import { BoostAudio } from '../audio/BoostAudio.js';
 import { WindAudio } from '../audio/WindAudio.js';
 import { CountdownAudio } from '../audio/CountdownAudio.js';
 import { useGameStore } from '../ui/store.js';
+import { saveToLeaderboard } from '../ui/Leaderboard.js';
 import type { PlayerId, PlayerSnapshot } from '@neon-drift/shared';
 
 export class Game {
@@ -95,6 +96,13 @@ export class Game {
   private remoteVehicles = new Map<PlayerId, RemoteVehicle>();
   private scene: any = null;
 
+  // Track centerline for respawning
+  private centerline: readonly { x: number; z: number; nx: number; nz: number }[] = [];
+
+  /** Out-of-bounds thresholds */
+  private static readonly FALL_Y = -10;
+  private static readonly MAX_TRACK_DIST = 300; // meters from nearest centerline point
+
   async init(container: HTMLElement): Promise<void> {
     // 1. Initialize Rapier WASM
     await RAPIER.init();
@@ -116,8 +124,9 @@ export class Game {
     // 5. Build track
     this.trackBuilder = new TrackBuilder(scene);
 
-    // 5b. Create checkpoint system — invisible distance-based zones
+    // 5b. Store centerline for respawn system + checkpoint system
     const cl = this.trackBuilder.getCenterline();
+    this.centerline = cl;
     const centerlineForCP = cl.map(p => ({ x: p.x, z: p.z, nx: p.nx, nz: p.nz }));
     this.checkpointSystem = new CheckpointSystem(centerlineForCP, 3);
     this.checkpointSystem.start(0);
@@ -333,9 +342,18 @@ export class Game {
       chassis.setBodyType(0, true); // 0 = Fixed — car becomes immovable
     }
 
-    // Show results IMMEDIATELY
+    // Save to leaderboard
     const store = useGameStore.getState();
     const myName = (window as any).__networkManager?.playerId?.slice(0, 6) ?? 'You';
+    saveToLeaderboard({
+      name: myName,
+      vehicleId: store.selectedVehicleId,
+      laps: 3,
+      time: totalTime,
+      date: new Date().toISOString(),
+    });
+
+    // Show results IMMEDIATELY
     store.setRaceResults([{
       id: ((window as any).__networkManager?.playerId ?? 'local') as any,
       name: myName,
@@ -344,11 +362,89 @@ export class Game {
     }]);
     store.setGamePhase('RESULTS');
 
-    // Notify server
+    // Notify server (include vehicleId for leaderboard)
     const nm = (window as any).__networkManager;
     if (nm?.connected) {
-      nm.socket?.emit('CLIENT_FINISHED', { time: totalTime });
+      nm.socket?.emit('CLIENT_FINISHED', { time: totalTime, vehicleId: store.selectedVehicleId });
     }
+  }
+
+  /**
+   * Find the closest centerline point index to a world position.
+   * Used for respawning the car back onto the track.
+   */
+  private findNearestCenterlineIndex(px: number, pz: number): number {
+    let minDist = Infinity;
+    let bestIdx = 0;
+    for (let i = 0; i < this.centerline.length; i++) {
+      const pt = this.centerline[i]!;
+      const dx = px - pt.x;
+      const dz = pz - pt.z;
+      const d = dx * dx + dz * dz; // squared distance is fine for comparison
+      if (d < minDist) {
+        minDist = d;
+        bestIdx = i;
+      }
+    }
+    return bestIdx;
+  }
+
+  /**
+   * Teleport the car back onto the track at the nearest centerline point.
+   * Zeros velocity/rotation so the player can start clean.
+   */
+  private respawnToTrack(): void {
+    if (!this.vehiclePhysics || this.centerline.length < 2) return;
+
+    const state = this.vehiclePhysics.getState();
+    const idx = this.findNearestCenterlineIndex(state.position.x, state.position.z);
+    const pt = this.centerline[idx]!;
+
+    // Get forward direction from consecutive centerline points
+    const nextIdx = (idx + 1) % this.centerline.length;
+    const next = this.centerline[nextIdx]!;
+    const dx = next.x - pt.x;
+    const dz = next.z - pt.z;
+    const len = Math.sqrt(dx * dx + dz * dz) || 1;
+    const fwdX = dx / len;
+    const fwdZ = dz / len;
+    const rotY = Math.atan2(fwdX, fwdZ);
+
+    // Reset physics body: position, rotation, and all velocities
+    const chassis = this.vehiclePhysics.getChassisBody();
+    chassis.setTranslation({ x: pt.x, y: 1.0, z: pt.z }, true);
+    chassis.setRotation({ x: 0, y: Math.sin(rotY / 2), z: 0, w: Math.cos(rotY / 2) }, true);
+    chassis.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    chassis.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
+    // Reset interpolation states so camera doesn't lerp from old position
+    this.prevState = {
+      px: pt.x, py: 1.0, pz: pt.z,
+      rx: 0, ry: Math.sin(rotY / 2), rz: 0, rw: Math.cos(rotY / 2),
+    };
+    this.currState = { ...this.prevState };
+  }
+
+  /**
+   * Check if the car is out of bounds and needs automatic respawn.
+   * Triggers on: falling below Y=-10, or being too far from any track point.
+   */
+  private checkOutOfBounds(): boolean {
+    if (!this.vehiclePhysics) return false;
+    const state = this.vehiclePhysics.getState();
+
+    // Fell off the world
+    if (state.position.y < Game.FALL_Y) return true;
+
+    // Too far from track — find nearest centerline point distance
+    const idx = this.findNearestCenterlineIndex(state.position.x, state.position.z);
+    const pt = this.centerline[idx]!;
+    const dx = state.position.x - pt.x;
+    const dz = state.position.z - pt.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist > Game.MAX_TRACK_DIST) return true;
+
+    return false;
   }
 
   private onFixedUpdate = (dt: number): void => {
@@ -356,6 +452,18 @@ export class Game {
 
     // Race finished — no more physics
     if (this.raceFinished) return;
+
+    // Out-of-bounds auto-respawn (fell off world or too far from track)
+    if (this.checkOutOfBounds()) {
+      this.respawnToTrack();
+      return; // skip this physics frame, let next frame pick up clean
+    }
+
+    // Manual reset: R key
+    if (this.inputManager.consumeReset()) {
+      this.respawnToTrack();
+      return;
+    }
 
     // Save previous state for interpolation
     this.prevState = { ...this.currState };

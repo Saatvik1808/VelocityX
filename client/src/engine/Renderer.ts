@@ -42,14 +42,35 @@ export class Renderer {
 
     // Handle resize + orientation change
     window.addEventListener('resize', this.handleResize);
-    window.addEventListener('orientationchange', this.handleResize);
+    window.addEventListener('orientationchange', this.handleOrientationChange);
 
     // Delayed initial resize to ensure container has dimensions
     setTimeout(() => this.handleResize(), 100);
     setTimeout(() => this.handleResize(), 500);
   }
 
+  /** Mobile browsers take up to 1s to settle viewport after orientation change */
+  private handleOrientationChange = (): void => {
+    this.handleResize();
+    setTimeout(() => this.handleResize(), 100);
+    setTimeout(() => this.handleResize(), 300);
+    setTimeout(() => this.handleResize(), 600);
+    setTimeout(() => this.handleResize(), 1000);
+  };
+
+  /** Call externally when UI layout changes (e.g., lobby hidden, game starts) */
+  forceResize(): void {
+    this.handleResize();
+    setTimeout(() => this.handleResize(), 50);
+    setTimeout(() => this.handleResize(), 200);
+  }
+
   private handleResize = (): void => {
+    // Force canvas to fill container (fixes mobile orientation change + lobby→game transition)
+    const w = this.container.clientWidth || window.innerWidth;
+    const h = this.container.clientHeight || window.innerHeight;
+    this.canvas.style.width = w + 'px';
+    this.canvas.style.height = h + 'px';
     this.engine.resize();
   };
 
@@ -62,7 +83,7 @@ export class Renderer {
 
   dispose(): void {
     window.removeEventListener('resize', this.handleResize);
-    window.removeEventListener('orientationchange', this.handleResize);
+    window.removeEventListener('orientationchange', this.handleOrientationChange);
     this.engine.dispose();
     this.canvas.remove();
   }

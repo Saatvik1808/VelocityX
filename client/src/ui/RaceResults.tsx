@@ -2,7 +2,9 @@
  * LEARNING NOTE: Race Results Screen — Premium Design
  */
 
+import { useState } from 'react';
 import type { RaceResult } from '@neon-drift/shared';
+import { Leaderboard } from './Leaderboard.js';
 
 const medals = ['1st', '2nd', '3rd'];
 const posColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
@@ -20,6 +22,13 @@ interface Props {
 }
 
 export function RaceResults({ results, onPlayAgain, onLeave }: Props) {
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const myTime = results[0]?.time;
+
+  if (showLeaderboard) {
+    return <Leaderboard onClose={() => setShowLeaderboard(false)} highlightTime={myTime} />;
+  }
+
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 2000,
@@ -93,8 +102,20 @@ export function RaceResults({ results, onPlayAgain, onLeave }: Props) {
           </div>
         ))}
 
+        {/* Leaderboard button */}
+        <button onClick={() => setShowLeaderboard(true)} style={{
+          width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+          background: 'linear-gradient(135deg, rgba(255,215,0,0.12), rgba(0,255,255,0.08))',
+          color: '#FFD700', cursor: 'pointer', fontWeight: 700, fontSize: 13,
+          letterSpacing: 2, marginTop: 20, marginBottom: 8,
+          boxShadow: '0 0 15px rgba(255,215,0,0.1)',
+          transition: 'all 0.2s',
+        }}>
+          &#127942; VIEW LEADERBOARD
+        </button>
+
         {/* Buttons */}
-        <div style={{ display: 'flex', gap: 12, marginTop: 28 }}>
+        <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
           <button onClick={onLeave} style={{
             flex: 1, padding: '14px', borderRadius: 12, border: 'none',
             background: 'rgba(255,255,255,0.06)', color: '#999',

@@ -10,12 +10,23 @@
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body, #root {
-        width: 100%; height: 100%; overflow: hidden; background: #000;
+        width: 100%; height: 100%;
+        /* dvh = dynamic viewport height — shrinks/grows with mobile address bar */
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow: hidden;
+        background: #000;
         touch-action: none;
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
+        /* Cover iOS safe areas (notch, status bar) */
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
       }
+      /* Fill behind safe areas with black */
+      body { background: #000; }
+      /* Prevent white flash on orientation change */
+      canvas { background: #000 !important; }
       /* Landscape prompt for portrait mode */
       @media (orientation: portrait) {
         #rotate-prompt {
