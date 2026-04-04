@@ -35,6 +35,13 @@ import { NitroSystem } from '../vehicles/NitroSystem.js';
 import { NetworkManager } from '../network/NetworkManager.js';
 import { EntityInterpolation } from '../network/EntityInterpolation.js';
 import { RemoteVehicle } from '../network/RemoteVehicle.js';
+import { AudioEngine } from '../audio/AudioEngine.js';
+import { EngineSynth } from '../audio/EngineSynth.js';
+import { TireAudio } from '../audio/TireAudio.js';
+import { ImpactAudio } from '../audio/ImpactAudio.js';
+import { BoostAudio } from '../audio/BoostAudio.js';
+import { WindAudio } from '../audio/WindAudio.js';
+import { CountdownAudio } from '../audio/CountdownAudio.js';
 import { useGameStore } from '../ui/store.js';
 import type { PlayerId, PlayerSnapshot } from '@neon-drift/shared';
 
@@ -57,6 +64,15 @@ export class Game {
   private sparkEmitter: SparkEmitter | null = null;
   private skidMarkRenderer: SkidMarkRenderer | null = null;
   private tronTrail: TronTrailRenderer | null = null;
+
+  // Audio
+  private audioEngine: AudioEngine | null = null;
+  private engineSynth: EngineSynth | null = null;
+  private tireAudio: TireAudio | null = null;
+  private impactAudio: ImpactAudio | null = null;
+  private boostAudio: BoostAudio | null = null;
+  private windAudio: WindAudio | null = null;
+  private countdownAudio: CountdownAudio | null = null;
 
   private elapsed = 0;
   private prevSpeed = 0;
@@ -223,6 +239,16 @@ export class Game {
     scene.detachControl();
     this.inputManager = new InputManager();
 
+    // 18b. Audio engine — procedural sound synthesis
+    this.audioEngine = new AudioEngine();
+    this.audioEngine.init();
+    this.engineSynth = new EngineSynth(this.audioEngine);
+    this.tireAudio = new TireAudio(this.audioEngine);
+    this.impactAudio = new ImpactAudio(this.audioEngine);
+    this.boostAudio = new BoostAudio(this.audioEngine);
+    this.windAudio = new WindAudio(this.audioEngine);
+    this.countdownAudio = new CountdownAudio(this.audioEngine);
+
     // 19. Game loop
     this.gameLoop = new GameLoop(this.onFixedUpdate, this.onRender);
 
@@ -281,13 +307,18 @@ export class Game {
 
     this.networkManager.onCountdown = (seconds: number) => {
       useGameStore.getState().setCountdownSeconds(seconds);
+      if (seconds > 0) {
+        this.countdownAudio?.beepCount();
+      } else {
+        this.countdownAudio?.beepGo();
+      }
     };
   }
 
   /** Immediately stop the car and show results */
   private finishRace(totalTime: number): void {
-    console.log(`RACE OVER! Time: ${totalTime.toFixed(2)}s`);
     this.raceFinished = true;
+    this.countdownAudio?.playFinish();
 
     // Freeze the car IMMEDIATELY
     if (this.vehiclePhysics) {
@@ -484,6 +515,27 @@ export class Game {
     // Speed-reactive post-processing
     this.postProcessing?.setSpeed(state.speed);
 
+    // === AUDIO UPDATES ===
+    const absSpeedMs = Math.abs(state.speed);
+    const rpm = Math.min(absSpeedMs / 45, 1); // normalized RPM from speed
+    const throttle = input.accelerate ? 1 : 0;
+
+    // Engine synth — RPM and throttle
+    this.engineSynth?.update(rpm, throttle, absSpeedMs);
+
+    // Tire screech — drift and turning
+    const steerAngleForAudio = Math.abs(this.vehiclePhysics.getWheelTransform(0).steering);
+    this.tireAudio?.update(input.drift, state.speed, steerAngleForAudio);
+
+    // Wind noise — scales with speed
+    this.windAudio?.update(state.speed);
+
+    // Impact detection for audio
+    if (speedDelta > 8 && absSpeedMs > 3) {
+      const impactForce = Math.min(speedDelta / 30, 1);
+      this.impactAudio?.trigger(impactForce);
+    }
+
     // Checkpoint detection — use visual position (which matches track coordinates)
     const carVisualPos = this.vehicleVisuals.root.position;
     const justFinished = this.checkpointSystem?.update(carVisualPos.x, carVisualPos.z, this.elapsed);
@@ -550,11 +602,12 @@ export class Game {
       const impulseScale = boostForce * dt * 1.5;
       chassis.applyImpulse({ x: fx * impulseScale, y: 0, z: fz * impulseScale }, true);
 
-      // Camera effects on first frame of boost
+      // Camera + audio effects on first frame of boost
       if (this.driftSystem.boostJustActivated) {
         const level = this.driftSystem.boostMultiplier;
         this.chaseCamera?.shake(0.3 + level * 0.4);
-        this.chaseCamera?.fovKick(5 + level * 10); // FOV widens then snaps back
+        this.chaseCamera?.fovKick(5 + level * 10);
+        this.boostAudio?.triggerBoost(level);
         this.driftSystem.boostJustActivated = false;
       }
     }
@@ -565,6 +618,7 @@ export class Game {
     const nitroForce = this.nitroSystem.update(input.nitro, isDrifting, driftBoostJustFired, state.speed, dt);
     store.setNitroTank(this.nitroSystem.tankPercent);
     store.setNitroActive(this.nitroSystem.active);
+    this.boostAudio?.updateNitro(this.nitroSystem.active, this.nitroSystem.tankPercent);
 
     if (nitroForce > 0 && this.vehiclePhysics) {
       const chassis = this.vehiclePhysics.getChassisBody();
@@ -630,6 +684,14 @@ export class Game {
   dispose(): void {
     this.gameLoop?.stop();
     this.inputManager?.dispose();
+    // Audio cleanup
+    this.engineSynth?.dispose();
+    this.tireAudio?.dispose();
+    this.impactAudio?.dispose();
+    this.boostAudio?.dispose();
+    this.windAudio?.dispose();
+    this.countdownAudio?.dispose();
+    this.audioEngine?.dispose();
     this.tronTrail?.dispose();
     this.skidMarkRenderer?.dispose();
     this.sparkEmitter?.dispose();
