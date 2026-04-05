@@ -15,6 +15,7 @@ import { RaceResults } from './RaceResults.js';
 import { TouchControls } from './TouchControls.js';
 import { Settings } from './Settings.js';
 import { Leaderboard } from './Leaderboard.js';
+import { AITrainingPanel } from './AITrainingPanel.js';
 import { useGameStore } from './store.js';
 import { Game } from '../engine/Game.js';
 import { NetworkManager } from '../network/NetworkManager.js';
@@ -35,6 +36,7 @@ export function App() {
   const [showLobby, setShowLobby] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(false);
   const [networkReady, setNetworkReady] = useState(false);
 
   // Connect network on mount and expose globally for Game.ts
@@ -133,6 +135,21 @@ export function App() {
         display: 'flex', gap: 6, pointerEvents: 'auto',
       }}>
         <button
+          onClick={() => setShowAIPanel(true)}
+          style={{
+            width: 36, height: 36, borderRadius: 8, border: 'none',
+            background: 'rgba(0, 0, 0, 0.5)', color: '#00ffc8',
+            cursor: 'pointer', fontSize: 15, display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            backdropFilter: 'blur(4px)',
+            boxShadow: '0 0 8px rgba(0,255,200,0.12)',
+            transition: 'all 0.2s',
+          }}
+          title="AI Neural Evolution"
+        >
+          &#129504;
+        </button>
+        <button
           onClick={() => setShowLeaderboard(true)}
           style={{
             width: 36, height: 36, borderRadius: 8, border: 'none',
@@ -169,6 +186,9 @@ export function App() {
 
       {/* Leaderboard overlay */}
       {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
+
+      {/* AI Training Panel overlay */}
+      {showAIPanel && <AITrainingPanel onClose={() => setShowAIPanel(false)} />}
 
       {/* Results screen overlay */}
       <ResultsOverlay onPlayAgain={() => window.location.reload()} onLeave={() => window.location.reload()} />

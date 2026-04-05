@@ -44,6 +44,7 @@ import { WindAudio } from '../audio/WindAudio.js';
 import { CountdownAudio } from '../audio/CountdownAudio.js';
 import { useGameStore } from '../ui/store.js';
 import { saveToLeaderboard } from '../ui/Leaderboard.js';
+import { TelemetryCollector } from '../ai/telemetry/TelemetryCollector.js';
 import type { PlayerId, PlayerSnapshot } from '@neon-drift/shared';
 
 export class Game {
@@ -89,6 +90,9 @@ export class Game {
   private driftSystem: DriftSystem = new DriftSystem();
   private nitroSystem = new NitroSystem();
   private raceFinished = false;
+
+  // AI Telemetry
+  private telemetryCollector: TelemetryCollector | null = null;
 
   // Multiplayer
   private networkManager: NetworkManager | null = null;
@@ -272,6 +276,13 @@ export class Game {
     useGameStore.getState().setGamePhase('PLAYING');
     this.gameLoop.start();
 
+    // Expose game instance for AI training panel to access track data
+    (window as any).__gameInstance = this;
+
+    // 20b. Telemetry collector for AI systems
+    this.telemetryCollector = new TelemetryCollector();
+    this.telemetryCollector.startSession(selectedVehicle);
+
     // 21. Setup multiplayer hooks
     this.setupNetworking(scene);
   }
@@ -361,6 +372,14 @@ export class Game {
       position: 1,
     }]);
     store.setGamePhase('RESULTS');
+
+    // Save telemetry for AI systems (player skill profiling + physics evolution)
+    if (this.telemetryCollector?.recording) {
+      const session = this.telemetryCollector.endSession();
+      if (session) {
+        TelemetryCollector.saveSession(session);
+      }
+    }
 
     // Notify server (include vehicleId for leaderboard)
     const nm = (window as any).__networkManager;
@@ -491,6 +510,24 @@ export class Game {
           rx: s.rotation.x, ry: s.rotation.y, rz: s.rotation.z, rw: s.rotation.w,
           speed: s.speed, steering: 0,
         },
+      });
+    }
+
+    // Record telemetry for AI systems (sampled internally at 20Hz)
+    if (this.telemetryCollector?.recording) {
+      const store = useGameStore.getState();
+      this.telemetryCollector.recordFrame({
+        raceTime: store.raceTime,
+        speed: s.speed,
+        posX: s.position.x,
+        posZ: s.position.z,
+        isDrifting: store.isDrifting,
+        driftChargeLevel: store.boostLevel,
+        isNitroActive: store.nitroActive,
+        nitroTank: store.nitroTank,
+        checkpointIndex: store.currentCheckpoint ?? 0,
+        lap: store.lap,
+        input,
       });
     }
   };
@@ -793,7 +830,13 @@ export class Game {
     this.sceneManager.scene.render();
   };
 
+  /** Expose track data for AI training system */
+  getTrackCenterline(): readonly { x: number; z: number; nx: number; nz: number }[] {
+    return this.centerline;
+  }
+
   dispose(): void {
+    (window as any).__gameInstance = null;
     this.gameLoop?.stop();
     this.inputManager?.dispose();
     // Audio cleanup

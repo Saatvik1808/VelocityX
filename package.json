@@ -15,8 +15,5 @@
     "build": "npm run build --workspaces --if-present",
     "start": "node --import tsx server/src/GameServer.ts",
     "type-check": "tsc --build"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13"
   }
 }

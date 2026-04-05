@@ -207,8 +207,18 @@ setInterval(() => {
   }
 }, TICK_INTERVAL);
 
-// === Start Server ===
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : NETWORK.SERVER_PORT;
-httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`VelocityX server running on port ${PORT}`);
+// === Start Server (async — wait for database init) ===
+async function startServer(): Promise<void> {
+  // Initialize SQLite database (async WASM loading)
+  await persistence.init();
+
+  const PORT = process.env.PORT ? parseInt(process.env.PORT) : NETWORK.SERVER_PORT;
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`VelocityX server running on port ${PORT}`);
+  });
+}
+
+startServer().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
